@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { NavLink, Outlet, Link } from 'react-router-dom'
-import { LevelSheet } from './LevelSheet.tsx'
+import { Link, NavLink, Outlet } from 'react-router-dom'
+import { MoreSheet } from './MoreSheet.tsx'
 import { levelInfo } from '../lib/levels.ts'
 import { daysUntilExam } from '../lib/session.ts'
 import { todayISO } from '../lib/date.ts'
@@ -12,7 +12,7 @@ import { useSettings } from '../state/AppContext.tsx'
  */
 
 const navItemClass =
-  'flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-[11px] leading-tight'
+  'flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 px-0.5 text-[11px] leading-tight'
 
 function tabClass({ isActive }: { isActive: boolean }) {
   return `${navItemClass} ${isActive ? 'text-accent' : 'text-muted hover:text-ink'}`
@@ -20,7 +20,7 @@ function tabClass({ isActive }: { isActive: boolean }) {
 
 export function AppShell() {
   const settings = useSettings()
-  const [levelOpen, setLevelOpen] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
   const today = todayISO()
   const daysLeft = daysUntilExam(settings.examDate, today)
   const level = levelInfo(settings.level)
@@ -58,17 +58,27 @@ export function AppShell() {
           <span className="font-medium">Drill</span>
           <span className="text-faint">facts</span>
         </NavLink>
-        <button type="button" onClick={() => setLevelOpen(true)} className={`${navItemClass} text-muted hover:text-ink`}>
-          <span className="font-medium">Difficulty</span>
+        <NavLink to="/practice" className={tabClass}>
+          <span className="font-medium">Practice</span>
+          <span className="text-faint">questions</span>
+        </NavLink>
+        <NavLink to="/sandbox" className={tabClass}>
+          <span className="font-medium">Sandbox</span>
+          <span className="text-faint">queries</span>
+        </NavLink>
+        <button
+          type="button"
+          onClick={() => setMoreOpen(true)}
+          aria-haspopup="dialog"
+          aria-expanded={moreOpen}
+          className={`${navItemClass} text-muted hover:text-ink`}
+        >
+          <span className="font-medium">More</span>
           <span className="text-faint">{level.name}</span>
         </button>
-        <NavLink to="/settings" className={tabClass}>
-          <span className="font-medium">Settings</span>
-          <span className="text-faint">exam day</span>
-        </NavLink>
       </nav>
 
-      <LevelSheet open={levelOpen} onClose={() => setLevelOpen(false)} />
+      <MoreSheet open={moreOpen} onClose={() => setMoreOpen(false)} />
     </div>
   )
 }

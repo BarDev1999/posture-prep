@@ -9,8 +9,10 @@
     "dev": "npm run content && vite",
     "build": "npm run content && npm run typecheck && vite build",
     "preview": "vite preview",
-    "verify": "node scripts/verify-stage1.ts",
-    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.scripts.json"
+    "verify": "node scripts/verify-core.ts && node scripts/verify-sandbox.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.scripts.json",
+    "verify:sandbox": "node scripts/verify-sandbox.ts",
+    "verify:core": "node scripts/verify-core.ts"
   },
   "dependencies": {
     "lowlight": "^3.3.0",
@@ -19,6 +21,7 @@
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.18.3",
     "remark-gfm": "^4.0.1",
+    "sql.js": "^1.14.2",
     "unist-util-visit": "^5.1.0"
   },
   "devDependencies": {
@@ -26,6 +29,7 @@
     "@types/node": "^26.4.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.5",
+    "@types/sql.js": "^1.4.11",
     "@vitejs/plugin-react": "^6.1.1",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",

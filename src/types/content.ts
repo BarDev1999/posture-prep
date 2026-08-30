@@ -20,6 +20,8 @@ export type Fact = {
   back: string
   /** True when file D's priority list names this fact. */
   isPriority: boolean
+  /** Reference articles that actually discuss this fact. Often empty. */
+  relatedArticles: string[]
 }
 
 export type Question = {
@@ -38,6 +40,16 @@ export type Question = {
   answer: string
   answerLetter: string | null
   referenceSql: string | null
+  /** Buggy Python shown in the question, when the question shows code. */
+  promptCode: string | null
+  /** Model Python from the answer, diffed against promptCode. */
+  answerCode: string | null
+  /**
+   * Reference articles that discuss this question. Empty for the many
+   * questions file A does not cover, which is deliberate: no link beats a
+   * confident link to an article that will not help.
+   */
+  relatedArticles: string[]
 }
 
 export type Article = {
@@ -68,5 +80,7 @@ export type ContentBundle = {
     sqlQuestions: number
     mcqTotal: number
     mcqWithOptions: number
+    questionsWithReference: number
+    pythonDiffs: number
   }
 }

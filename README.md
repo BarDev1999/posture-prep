@@ -25,7 +25,9 @@ npm run build
 | `npm run build` | Parses the content, typechecks, then builds to `dist/` |
 | `npm run preview` | Serves the built output, which is the only way to test the service worker |
 | `npm run content` | Runs the parser on its own |
-| `npm run verify` | Checks the parser failures, the Leitner rules and the session queue |
+| `npm run verify` | Runs both check suites below |
+| `npm run verify:core` | Parser failures, Leitner rules, session and practice queues, search, diffs |
+| `npm run verify:sandbox` | Builds the seeded database and runs every reference query from file C |
 | `npm run typecheck` | Typechecks the app and the build scripts |
 | `npm run icons` | Regenerates the app icons in `public/` |
 
@@ -62,7 +64,8 @@ to `main`. Enable Pages for the repository with source set to GitHub Actions.
 The workflow passes `VITE_BASE=/<repository-name>/`, which sets the Vite base, the
 service worker scope and the manifest `start_url` together. Getting those out of step is
 the usual way a progressive web app silently breaks under a Pages subpath. Locally the
-base defaults to `/posture-prep/`; `npm run dev` ignores it.
+base defaults to `/posture-prep/`, and the dev server uses it too, so development and
+production share one set of URLs.
 
 Routing uses hashes (`/#/drill`) so a deep link cannot 404 on Pages before the service
 worker is installed.
@@ -71,11 +74,12 @@ worker is installed.
 
 ```
 content/source/    the four markdown files, the only source of study content
-scripts/           build-content.ts (parser), verify-stage1.ts, make-icons.mjs
-src/lib/           storage, Leitner scheduling, session assembly, dates, highlighting
+scripts/           build-content.ts (parser), verify-core.ts, verify-sandbox.ts, make-icons.mjs
+src/lib/           storage, Leitner scheduling, session and practice queues, search
+src/lib/sql/       schema conversion, seed data, sql.js wrapper, result set grading
 src/state/         React context plus a reducer, the whole app state
-src/routes/        Home, Drill, Settings
-src/components/    shell, markdown renderer, difficulty control, progress bar
+src/routes/        Home, Drill, Practice, Sandbox, Library, Settings
+src/components/    shell, markdown renderer, code diff, result table, more sheet
 src/data/          content.json, generated, not committed
 ```
 
@@ -85,7 +89,8 @@ Built in the order set by the spec, one commit per stage.
 
 1. **Stage 1, done.** Project setup, content parser, storage, routing, home screen, fact
    drill with Leitner scheduling, progressive web app and service worker, dark mode.
-2. **Stage 2.** Query sandbox on sql.js, question practice, reference library, the
-   difficulty level system applied across screens.
+2. **Stage 2, done.** Query sandbox on sql.js with a seeded database and grading by
+   result set, question practice for every format, reference library with search, and
+   the difficulty level system.
 3. **Stage 3.** Mock exam, explain it back, export and import, extra content import.
 4. **Stage 4.** Styling pass against real content.

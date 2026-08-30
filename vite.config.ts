@@ -39,7 +39,7 @@ export default defineConfig({
       workbox: {
         // Content ships inside the JS bundle, so precaching the build output is
         // enough to make the whole app work with the network disabled.
-        globPatterns: ['**/*.{js,css,html,svg,png,ico,json,woff2}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,ico,json,wasm,woff2}'],
         navigateFallback: `${base}index.html`,
         cleanupOutdatedCaches: true,
       },

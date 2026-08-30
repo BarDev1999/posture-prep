@@ -557,6 +557,100 @@ function parseArticles(aText: string): ParsedArticle[] {
   return articles
 }
 
+// ------------------------------------------------------------ code blocks
+
+/** First fenced block of a given language, used for the Python before and after diff. */
+function firstCodeBlock(markdown: string, language: string): string | null {
+  const pattern = new RegExp('```' + language + '\\n([\\s\\S]*?)\\n```')
+  const match = pattern.exec(markdown)
+  return match ? (match[1] ?? null) : null
+}
+
+// -------------------------------------------------------- related articles
+
+const STOPWORDS = new Set([
+  'the', 'and', 'that', 'this', 'with', 'for', 'from', 'you', 'your', 'what', 'which', 'when', 'where',
+  'who', 'why', 'how', 'not', 'are', 'was', 'were', 'has', 'have', 'had', 'can', 'will', 'would', 'does',
+  'did', 'but', 'its', 'it', 'one', 'two', 'three', 'all', 'any', 'each', 'every', 'into', 'onto', 'out',
+  'over', 'under', 'than', 'then', 'there', 'their', 'them', 'they', 'his', 'her', 'him', 'she', 'and',
+  'give', 'name', 'explain', 'describe', 'write', 'return', 'returns', 'given', 'answer', 'question',
+  'example', 'difference', 'between', 'first', 'second', 'third', 'more', 'most', 'only', 'also', 'use',
+  'used', 'using', 'still', 'must', 'should', 'because', 'about', 'without', 'inside', 'after', 'before',
+])
+
+function tokenize(text: string): string[] {
+  return text
+    .toLowerCase()
+    .replace(/```[\s\S]*?```/g, ' ')
+    .split(/[^a-z0-9_.-]+/)
+    .map((token) => token.replace(/^[.-]+|[.-]+$/g, ''))
+    .filter((token) => token.length >= 3 && !STOPWORDS.has(token) && !/^\d+$/.test(token))
+}
+
+/**
+ * Links each question and fact to the reference articles that actually discuss
+ * it, scored by term overlap weighted towards rare terms. This is an index over
+ * the source files, not new content: a question with no strong match gets no
+ * link rather than a guessed one.
+ */
+function buildArticleIndex(articles: ParsedArticle[]) {
+  const articleTokens = articles.map((article) => {
+    const counts = new Map<string, number>()
+    for (const token of tokenize(`${article.title}\n${article.markdown}`)) {
+      counts.set(token, (counts.get(token) ?? 0) + 1)
+    }
+    return counts
+  })
+
+  const documentFrequency = new Map<string, number>()
+  for (const counts of articleTokens) {
+    for (const token of counts.keys()) documentFrequency.set(token, (documentFrequency.get(token) ?? 0) + 1)
+  }
+
+  const total = articles.length
+
+  /**
+   * Tuned against the real files. A question about prompt injection or the
+   * OWASP lists scores above 20 against the frameworks article; a plain SQL or
+   * Python question, which file A simply does not cover, tops out around 8.
+   * The floor sits between the two so those questions get no link at all,
+   * rather than a confident link to an article that will not help.
+   */
+  const MIN_SCORE = 10
+
+  return function relatedTo(text: string, limit = 2): string[] {
+    const queryTokens = [...new Set(tokenize(text))]
+    if (queryTokens.length === 0) return []
+
+    const scores = articles.map((article, index) => {
+      const counts = articleTokens[index]
+      if (!counts) return { id: article.id, score: 0 }
+      let score = 0
+      for (const token of queryTokens) {
+        const inArticle = counts.get(token)
+        if (!inArticle) continue
+        const frequency = documentFrequency.get(token) ?? total
+        const idf = Math.log((total + 1) / frequency)
+        // A term that appears in only one or two articles is the strongest
+        // signal there is, and repeated mentions count for less than the first.
+        const rarity = frequency <= 2 ? 2.5 : 1
+        score += idf * idf * (1 + Math.log(inArticle)) * rarity
+      }
+      // Divided by query length so a long scenario is not favoured over a
+      // one line question purely for having more words.
+      return { id: article.id, score: score / Math.sqrt(queryTokens.length) }
+    })
+
+    const best = scores.sort((a, b) => b.score - a.score)
+    const top = best[0]
+    if (!top || top.score < MIN_SCORE) return []
+    return best
+      .filter((entry) => entry.score >= Math.max(MIN_SCORE, top.score * 0.7))
+      .slice(0, limit)
+      .map((entry) => entry.id)
+  }
+}
+
 // --------------------------------------------------------------------- main
 
 console.log('\n  Building content from ' + SOURCE_DIR)
@@ -596,6 +690,8 @@ if (questionsWithoutAnswer.length > 0 || answersWithoutQuestion.length > 0) {
   fail('Questions and answers do not pair up by ID.', detail)
 }
 
+const relatedTo = buildArticleIndex(articles)
+
 const questions = parsedQuestions.map((q) => {
   const answer = answersById.get(q.id)
   if (!answer) fail(`No answer for ${q.id}.`)
@@ -604,8 +700,18 @@ const questions = parsedQuestions.map((q) => {
     answer: answer.markdown,
     answerLetter: answer.answerLetter,
     referenceSql: q.format === 'SQL' ? answer.referenceSql : null,
+    // Buggy code as shown in the question, and the model code from the answer.
+    // Question practice diffs one against the other line by line.
+    promptCode: firstCodeBlock(q.prompt, 'python'),
+    answerCode: firstCodeBlock(answer.markdown, 'python'),
+    relatedArticles: relatedTo(`${q.prompt}\n${q.subsection ?? ''}`),
   }
 })
+
+const factsWithLinks = facts.map((fact) => ({
+  ...fact,
+  relatedArticles: relatedTo(`${fact.front}\n${fact.back}`, 1),
+}))
 
 // A section that quietly lost questions to a parsing slip is a silent failure,
 // so check parsed counts against the counts the source file states for itself.
@@ -631,12 +737,14 @@ const content = {
   })),
   sqlSchema: sqlSchema.sql,
   sqlSchemaTables: sqlSchema.tables,
-  facts,
+  facts: factsWithLinks,
   questions,
   articles,
   counts: {
     facts: facts.length,
     priorityFacts: facts.filter((f) => f.isPriority).length,
+    questionsWithReference: questions.filter((q) => q.relatedArticles.length > 0).length,
+    pythonDiffs: questions.filter((q) => q.promptCode && q.answerCode).length,
     questions: questions.length,
     answers: parsedAnswers.length,
     articles: articles.length,
@@ -657,6 +765,7 @@ console.log(`  Questions: ${content.counts.questions}, every one paired with an 
 console.log(`             ${byDifficulty}`)
 console.log(`             ${byFormat}`)
 console.log(`  MCQ options parsed: ${content.counts.mcqWithOptions} of ${content.counts.mcqTotal}`)
+console.log(`  Linked:    ${content.counts.questionsWithReference} of ${content.counts.questions} questions have a reference article, ${content.counts.pythonDiffs} python diffs`)
 console.log(`  Articles:  ${content.counts.articles} (${articles.filter((a) => a.hasTable).length} contain tables)`)
 console.log(`  Schema:    ${sqlSchema.tables.length} tables (${sqlSchema.tables.join(', ')})`)
 console.log(`  Wrote      ${OUT_FILE}\n`)

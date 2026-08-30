@@ -1,6 +1,13 @@
 import { createContext, useContext, useEffect, useReducer } from 'react'
 import type { Dispatch, ReactNode } from 'react'
-import type { Level, ProgressState, Rating, SessionRecord, ThemeSetting } from '../types/progress.ts'
+import type {
+  Level,
+  ProgressState,
+  QuestionResult,
+  Rating,
+  SessionRecord,
+  ThemeSetting,
+} from '../types/progress.ts'
 import { applyRating, newFactProgress } from '../lib/leitner.ts'
 import { defaultState, loadState, saveState } from '../lib/storage.ts'
 
@@ -20,6 +27,15 @@ export type Action =
       today: string
       elapsedMs: number
     }
+  | {
+      type: 'answer-question'
+      questionId: string
+      sectionId: number
+      result: QuestionResult
+      today: string
+      elapsedMs: number
+    }
+  | { type: 'clear-review'; questionId: string }
   | { type: 'set-theme'; theme: ThemeSetting }
   | { type: 'set-level'; level: Level }
   | { type: 'set-exam-date'; examDate: string }
@@ -55,6 +71,31 @@ export function reducer(state: ProgressState, action: Action): ProgressState {
         ...state,
         facts: { ...state.facts, [action.factId]: applyRating(previous, action.rating, action.today) },
         sessions: upsertSession(state.sessions, action.today, action.sectionId, Math.max(0, action.elapsedMs)),
+      }
+    }
+    case 'answer-question': {
+      const previous = state.questions[action.questionId]
+      return {
+        ...state,
+        questions: {
+          ...state.questions,
+          [action.questionId]: {
+            attempts: (previous?.attempts ?? 0) + 1,
+            lastResult: action.result,
+            // Anything short of correct comes back at the start of the next session.
+            inReviewQueue: action.result !== 'correct',
+            lastAttemptedAt: action.today,
+          },
+        },
+        sessions: upsertSession(state.sessions, action.today, action.sectionId, Math.max(0, action.elapsedMs)),
+      }
+    }
+    case 'clear-review': {
+      const previous = state.questions[action.questionId]
+      if (!previous) return state
+      return {
+        ...state,
+        questions: { ...state.questions, [action.questionId]: { ...previous, inReviewQueue: false } },
       }
     }
     case 'set-theme':

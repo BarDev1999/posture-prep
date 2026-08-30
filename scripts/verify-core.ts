@@ -16,8 +16,17 @@ import { applyRating, boxInterval, dueDate, isDue, newFactProgress } from '../sr
 import { addDays } from '../src/lib/date.ts'
 import { buildDrillQueue, currentStreak, rankByNeed, requeueMissed, sectionStats } from '../src/lib/session.ts'
 import { coerceState, defaultState } from '../src/lib/storage.ts'
+import {
+  allowsQuestion,
+  buildPracticeQueue,
+  reduceOptions,
+  reviewQueueSize,
+  sectionMediumCleared,
+} from '../src/lib/practice.ts'
+import { search } from '../src/lib/search.ts'
+import { changedLineCount, diffLines } from '../src/lib/diff.ts'
 import type { ContentBundle, Fact } from '../src/types/content.ts'
-import type { FactProgress } from '../src/types/progress.ts'
+import type { FactProgress, QuestionProgress } from '../src/types/progress.ts'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const SOURCE_DIR = resolve(ROOT, 'content', 'source')
@@ -279,6 +288,145 @@ check(
   'an unknown theme falls back to system',
   coerceState({ settings: { theme: 'neon' } }).settings.theme === 'system',
 )
+
+// ------------------------------------------------------------ level system
+
+section('Difficulty levels')
+
+const noAnswers: Record<string, QuestionProgress> = {}
+const allQuestions = content.questions
+
+check(
+  'every multiple choice question knows its correct option',
+  allQuestions.filter((q) => q.format === 'MCQ').every((q) => q.answerLetter !== null),
+)
+
+const levelOne = allQuestions.filter((q) => allowsQuestion(q, 1, noAnswers, allQuestions))
+check('level 1 serves only the easy set', levelOne.every((q) => q.difficulty === 'easy'), `${levelOne.length} questions`)
+check('level 1 is not empty', levelOne.length === 22, `got ${levelOne.length}`)
+
+const levelTwo = allQuestions.filter((q) => allowsQuestion(q, 2, noAnswers, allQuestions))
+check(
+  'level 2 serves easy and medium, and no hard until a section is cleared',
+  levelTwo.every((q) => q.difficulty !== 'hard') && levelTwo.length === 65,
+  `${levelTwo.length} questions`,
+)
+
+const levelThree = allQuestions.filter((q) => allowsQuestion(q, 3, noAnswers, allQuestions))
+check(
+  'level 3 serves hard questions and medium scenarios only',
+  levelThree.every((q) => q.difficulty === 'hard' || (q.format === 'scenario' && q.difficulty === 'medium')),
+  `${levelThree.length} questions`,
+)
+check('level 3 includes every hard question', levelThree.filter((q) => q.difficulty === 'hard').length === 26)
+
+// Clearing the medium set for section 5 should unlock its hard questions at level 2.
+const clearedSectionFive: Record<string, QuestionProgress> = {}
+for (const question of allQuestions.filter((q) => q.section === 5 && q.difficulty === 'medium')) {
+  clearedSectionFive[question.id] = {
+    attempts: 1,
+    lastResult: 'correct',
+    inReviewQueue: false,
+    lastAttemptedAt: today,
+  }
+}
+check('clearing the medium set is detected', sectionMediumCleared(5, allQuestions, clearedSectionFive))
+check('another section is not affected', !sectionMediumCleared(1, allQuestions, clearedSectionFive))
+const hardFive = allQuestions.find((q) => q.section === 5 && q.difficulty === 'hard')
+check(
+  'a cleared section unlocks its hard questions at level 2',
+  hardFive !== undefined && allowsQuestion(hardFive, 2, clearedSectionFive, allQuestions),
+)
+const hardOne = allQuestions.find((q) => q.section === 1 && q.difficulty === 'hard')
+check(
+  'an uncleared section keeps them locked',
+  hardOne !== undefined && !allowsQuestion(hardOne, 2, clearedSectionFive, allQuestions),
+)
+
+const fourOption = allQuestions.find((q) => q.format === 'MCQ' && q.options?.length === 4 && q.answerLetter !== null)
+if (fourOption && fourOption.options) {
+  const reduced = reduceOptions(fourOption.options, fourOption.answerLetter, 1)
+  const correctIndex = ['a', 'b', 'c', 'd'].indexOf(fourOption.answerLetter ?? '')
+  check('level 1 cuts four options down to two', reduced.options.length === 2)
+  check(
+    'and the correct answer is still one of them',
+    reduced.options.includes(fourOption.options[correctIndex] ?? ''),
+  )
+  check(
+    'level 2 leaves all four in place',
+    reduceOptions(fourOption.options, fourOption.answerLetter, 2).options.length === 4,
+  )
+}
+
+section('Practice queue')
+
+const practiceFresh = buildPracticeQueue(allQuestions, {}, 2, { sectionId: null, formats: null }, today)
+check('a fresh practice queue holds the whole level 2 pool', practiceFresh.order.length === 65)
+check('and counts them all as new', practiceFresh.freshCount === 65)
+
+const missedYesterday: Record<string, QuestionProgress> = {}
+const targetQuestion = allQuestions.find((q) => q.difficulty === 'medium' && q.section === 4)
+if (targetQuestion) {
+  missedYesterday[targetQuestion.id] = {
+    attempts: 1,
+    lastResult: 'wrong',
+    inReviewQueue: true,
+    lastAttemptedAt: addDays(today, -1),
+  }
+}
+const withReview = buildPracticeQueue(allQuestions, missedYesterday, 2, { sectionId: null, formats: null }, today)
+check(
+  'a question missed on an earlier day comes back first',
+  withReview.order[0] === targetQuestion?.id,
+  `first was ${withReview.order[0]}`,
+)
+check('the review count is reported', withReview.reviewCount === 1)
+check('the review queue size is readable from progress', reviewQueueSize(missedYesterday) === 1)
+
+const missedToday: Record<string, QuestionProgress> = {}
+if (targetQuestion) {
+  missedToday[targetQuestion.id] = {
+    attempts: 1,
+    lastResult: 'wrong',
+    inReviewQueue: true,
+    lastAttemptedAt: today,
+  }
+}
+const sameDay = buildPracticeQueue(allQuestions, missedToday, 2, { sectionId: null, formats: null }, today)
+check(
+  'a question missed a moment ago goes to the back instead',
+  sameDay.order[sameDay.order.length - 1] === targetQuestion?.id,
+)
+
+const formatFiltered = buildPracticeQueue(allQuestions, {}, 2, { sectionId: null, formats: ['MCQ'] }, today)
+check(
+  'the format filter serves only that format',
+  formatFiltered.order.every((id) => allQuestions.find((q) => q.id === id)?.format === 'MCQ'),
+)
+
+section('Search and diffs')
+
+const imdsHits = search('imds')
+check('search finds a term across kinds', imdsHits.length >= 3, `${imdsHits.length} hits`)
+check(
+  'search covers articles, questions and facts',
+  new Set(search('injection').map((hit) => hit.kind)).size >= 2,
+  [...new Set(search('injection').map((hit) => hit.kind))].join(','),
+)
+check('a one letter query returns nothing', search('a').length === 0)
+check('a term that appears nowhere returns nothing', search('zzzznotathing').length === 0)
+
+const bugHunt = allQuestions.filter((q) => q.promptCode !== null && q.answerCode !== null)
+check('three python questions can be diffed', bugHunt.length === 3, `got ${bugHunt.length}`)
+for (const question of bugHunt) {
+  const lines = diffLines(question.promptCode ?? '', question.answerCode ?? '')
+  const changed = changedLineCount(lines)
+  check(
+    `${question.id} diffs to a small, readable change`,
+    changed > 0 && changed < lines.length,
+    `${changed} changed of ${lines.length} lines`,
+  )
+}
 
 // --------------------------------------------------------------------- done
 
