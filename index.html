@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="description" content="Fact drills and practice for the security posture researcher assessment." />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f4f6f8" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0b0f14" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Posture" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <title>Posture Prep</title>
+    <script>
+      // Resolve the theme before first paint so a dark phone never flashes white.
+      // Reads the same single storage key the app writes; src/lib/storage.ts stays
+      // the only module that touches localStorage once React is running.
+      ;(function () {
+        var dark = false
+        try {
+          var raw = localStorage.getItem('posture-prep.v1')
+          var theme = raw ? (JSON.parse(raw).settings || {}).theme : 'system'
+          if (theme !== 'light' && theme !== 'dark') theme = 'system'
+          dark = theme === 'system' ? window.matchMedia('(prefers-color-scheme: dark)').matches : theme === 'dark'
+        } catch (error) {
+          dark = window.matchMedia('(prefers-color-scheme: dark)').matches
+        }
+        document.documentElement.classList.toggle('dark', dark)
+      })()
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
