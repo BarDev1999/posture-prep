@@ -12,7 +12,8 @@
     "verify": "node scripts/verify-core.ts && node scripts/verify-sandbox.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.scripts.json",
     "verify:sandbox": "node scripts/verify-sandbox.ts",
-    "verify:core": "node scripts/verify-core.ts"
+    "verify:core": "node scripts/verify-core.ts",
+    "verify:offline": "node scripts/verify-offline.ts"
   },
   "dependencies": {
     "lowlight": "^3.3.0",

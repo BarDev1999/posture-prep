@@ -28,6 +28,7 @@ npm run build
 | `npm run verify` | Runs both check suites below |
 | `npm run verify:core` | Parser failures, Leitner rules, session and practice queues, search, diffs |
 | `npm run verify:sandbox` | Builds the seeded database and runs every reference query from file C |
+| `npm run verify:offline` | Audits `dist/` for the service worker and subpath wiring, after a build |
 | `npm run typecheck` | Typechecks the app and the build scripts |
 | `npm run icons` | Regenerates the app icons in `public/` |
 
@@ -72,6 +73,13 @@ production share one set of URLs.
 
 Routing uses hashes (`/#/drill`) so a deep link cannot 404 on Pages before the service
 worker is installed.
+
+`npm run verify:offline` checks the built output for the usual silent failures: an asset
+missing from the precache list, a manifest scope that does not match the base, an
+absolute precache URL, or a runtime call to another origin. It audits the build, not the
+runtime. **Loading the app with the network disabled still needs confirming once in a
+real browser**: `npm run build && npm run preview`, open it, then use the browser's
+offline toggle and reload.
 
 ## Layout
 
