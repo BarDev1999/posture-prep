@@ -25,9 +25,10 @@ npm run build
 | `npm run build` | Parses the content, typechecks, then builds to `dist/` |
 | `npm run preview` | Serves the built output, which is the only way to test the service worker |
 | `npm run content` | Runs the parser on its own |
-| `npm run verify` | Runs both check suites below |
+| `npm run verify` | Runs the three check suites below |
 | `npm run verify:core` | Parser failures, Leitner rules, session and practice queues, search, diffs |
 | `npm run verify:sandbox` | Builds the seeded database and runs every reference query from file C |
+| `npm run verify:lessons` | Curriculum graph, lesson shape, sources, backward fading, Parsons rules, and every lesson query against the sandbox |
 | `npm run verify:offline` | Audits `dist/` for the service worker and subpath wiring, after a build |
 | `npm run typecheck` | Typechecks the app and the build scripts |
 | `npm run icons` | Regenerates the app icons in `public/` |
@@ -88,12 +89,48 @@ DESIGN.md          the token plan and its critique, written at stage 4
 content/source/    the four markdown files, the only source of study content
 scripts/           build-content.ts (parser), verify-core.ts, verify-sandbox.ts, make-icons.mjs
 src/lib/           storage, Leitner scheduling, session and practice queues, search
+src/lib/learn.ts   unlocking, backward fading, Parsons grading, guidance tiers
 src/lib/sql/       schema conversion, seed data, sql.js wrapper, result set grading
 src/state/         React context plus a reducer, the whole app state
-src/routes/        Home, Drill, Practice, Sandbox, Library, Mock, Explain, Settings
+src/routes/        Home, Drill, Practice, Sandbox, Library, Mock, Explain, Settings, Learn, Lesson
 src/components/    shell, markdown renderer, code diff, result table, more sheet
+src/components/learn/  lesson diagrams and the Parsons widget
 src/data/          content.json, generated, not committed
+src/data/curriculum.ts     the 58 lesson graph and its prerequisites
+src/data/misconceptions.ts the documented misconception list every trap maps to
+src/data/lessons/          one file per lesson
 ```
+
+## The Learn module
+
+The practice side of the app tests. The Learn module teaches, and the two are different
+jobs: a lesson builds a model before retrieval is possible, so every lesson runs worked
+example first and free production last, with the scaffolding faded out step by step.
+
+Every lesson is nine steps, always all nine, always in this order:
+
+1. vocabulary, so no term is used before it is defined
+2. the mental model, with an inline SVG diagram
+3. the fully worked example, with self explanation prompts that must be opened
+4. the light fade, with the last step blanked
+5. the heavy fade, with more blanked, always counting backwards from the end
+6. a Parsons problem, blocks to put in order, with distractors above level 1
+7. free production, graded on the rows it returns by the existing sql.js sandbox
+8. a trap, drawn from the documented misconception list, never invented
+9. the handoff into practice or the drill, filtered to that lesson's tagged items
+
+Failing step 7 does not reveal the answer. It drops the learner back to step 6 with the
+same problem as blocks, and a lesson finished that way does not count towards fluency.
+
+Lessons are typed modules rather than JSON. The spec asked for structured JSON, one file
+per lesson; the shape is the same and so is hand editing one file, but a nine field
+object and a discriminated union cannot be typechecked through a JSON import, and a typo
+in a later lesson should fail the build rather than blank a screen on a phone.
+
+Every factual claim traces to files A to D through the `sources` array on each lesson.
+`npm run verify:lessons` resolves every source to a fact id, question id, article id or
+a heading that really exists in one of the four files, checks that every trap names a
+documented misconception, and runs every model query against the seeded database.
 
 ## Build stages
 
@@ -108,3 +145,16 @@ Built in the order set by the spec, one commit per stage.
    progress export and import, extra fact deck import, reset behind a typed confirmation.
 4. **Stage 4, done.** Styling pass against real content. The token plan and the
    critique behind it are in [DESIGN.md](DESIGN.md).
+
+The Learn module has its own stages, set by the second spec.
+
+- **Stage A, done.** Curriculum graph, lesson data format, topic map, the nine step
+  lesson player, progress schema version 3 with its migration, and lessons 1 to 6.
+- **Stage B.** The full Parsons widget: drag and drop on top of the tap to place
+  interaction that ships here, plus indentation for Python. Then lessons 7 to 14.
+- **Stage C.** Trace stepper, then the Python lessons, 15 to 23.
+- **Stage D.** Rule builder, then AI security, 24 to 34.
+- **Stage E.** Sections 3, 4 and 5, lessons 35 to 58.
+- **Stage F.** Guidance fading tiers applied to the player, the blocked to interleaved
+  transition, and misconception weak spots on the home screen. Stage A stores every
+  counter these need; nothing consumes them yet.

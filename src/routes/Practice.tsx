@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Markdown } from '../components/Markdown.tsx'
 import { CodeDiff } from '../components/CodeDiff.tsx'
+import { getLesson } from '../data/lessons/index.ts'
 import { articleById, questions, sections } from '../lib/content.ts'
 import { todayISO } from '../lib/date.ts'
 import { buildPracticeQueue, reduceOptions, reviewQueueSize } from '../lib/practice.ts'
@@ -32,6 +33,12 @@ export function Practice() {
   const today = todayISO()
   const level = progress.settings.level
 
+  // A lesson handoff arrives as ?lesson=L4 and pins practice to that lesson's
+  // questions. This is the blocked half of the hybrid schedule: while a topic
+  // is being learned, practice on it is the same small set, repeated.
+  const [search, setSearch] = useSearchParams()
+  const lesson = getLesson(search.get('lesson') ?? '')
+
   const [filters, setFilters] = useState<PracticeFilters>({ sectionId: null, formats: null })
   const [queue, setQueue] = useState<string[]>([])
   const [index, setIndex] = useState(0)
@@ -47,14 +54,16 @@ export function Practice() {
     progressRef.current = progress.questions
   })
 
-  const filterKey = `${filters.sectionId}|${filters.formats?.join(',') ?? 'all'}|${level}`
+  const filterKey = `${filters.sectionId}|${filters.formats?.join(',') ?? 'all'}|${level}|${lesson?.id ?? ''}`
   useEffect(() => {
     // "All" means everything except queries, which are answered in the sandbox
     // where they can actually run. Picking the SQL chip still brings them here.
-    const effective: PracticeFilters = {
-      ...filters,
-      formats: filters.formats ?? ['MCQ', 'short', 'scenario', 'Python'],
-    }
+    const effective: PracticeFilters = lesson
+      ? { sectionId: null, formats: null, questionIds: lesson.practice.questionIds }
+      : {
+          ...filters,
+          formats: filters.formats ?? ['MCQ', 'short', 'scenario', 'Python'],
+        }
     const built = buildPracticeQueue(questions, progressRef.current, level, effective, today)
     setQueue(built.order)
     setIndex(0)
@@ -115,7 +124,25 @@ export function Practice() {
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-4">
-      <div className="flex flex-wrap items-center gap-2">
+      {lesson ? (
+        <div className="mb-3 border-l-2 border-accent bg-sheet p-3">
+          <p className="eyebrow">Blocked practice</p>
+          <p className="mt-1 text-sm leading-relaxed">
+            The {lesson.practice.questionIds.length} question
+            {lesson.practice.questionIds.length === 1 ? '' : 's'} tagged to lesson {lesson.number}, {lesson.title}.
+            Nothing else is mixed in until the topic is finished.
+          </p>
+          <button
+            type="button"
+            onClick={() => setSearch({})}
+            className="mt-2 min-h-11 w-full rounded-sm border border-rule text-sm text-muted hover:text-ink"
+          >
+            Practise everything instead
+          </button>
+        </div>
+      ) : null}
+
+      <div className={`flex flex-wrap items-center gap-2 ${lesson ? 'hidden' : ''}`}>
         <select
           value={filters.sectionId === null ? 'all' : String(filters.sectionId)}
           onChange={(event) =>
@@ -138,7 +165,7 @@ export function Practice() {
         </span>
       </div>
 
-      <div className="mt-2 flex flex-wrap gap-1.5">
+      <div className={`mt-2 flex flex-wrap gap-1.5 ${lesson ? 'hidden' : ''}`}>
         <FormatChip
           label="All"
           active={filters.formats === null}
@@ -154,7 +181,7 @@ export function Practice() {
         ))}
       </div>
 
-      {filters.formats === null ? (
+      {filters.formats === null && !lesson ? (
         <p className="mt-1.5 text-[11px] text-faint">Queries are practised in the sandbox. Tap SQL to see them here.</p>
       ) : null}
 

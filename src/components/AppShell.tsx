@@ -59,6 +59,10 @@ export function AppShell() {
           <span>Home</span>
           <span className="text-faint">progress</span>
         </NavLink>
+        <NavLink to="/learn" className={tabClass}>
+          <span>Learn</span>
+          <span className="text-faint">lessons</span>
+        </NavLink>
         <NavLink to="/drill" className={tabClass}>
           <span>Drill</span>
           <span className="text-faint">facts</span>

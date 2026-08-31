@@ -1,7 +1,11 @@
 import type {
   ExtraFact,
   FactProgress,
+  GuidanceTier,
   Level,
+  LessonProgress,
+  LessonStatus,
+  MisconceptionProgress,
   MockAttempt,
   MockVariant,
   ProgressState,
@@ -11,6 +15,7 @@ import type {
   SessionRecord,
   Settings,
   ThemeSetting,
+  TopicProgress,
 } from '../types/progress.ts'
 import { clampBox } from './leitner.ts'
 import { isValidISODate } from './date.ts'
@@ -29,7 +34,7 @@ import { isValidISODate } from './date.ts'
  * rather than orphaned under a key nothing reads any more.
  */
 export const STORAGE_KEY = 'posture-prep.v1'
-export const SCHEMA_VERSION = 2
+export const SCHEMA_VERSION = 3
 export const DEFAULT_EXAM_DATE = '2026-09-03'
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -49,6 +54,9 @@ export function defaultState(): ProgressState {
     sessions: [],
     mockAttempts: [],
     extraFacts: [],
+    lessons: {},
+    topics: {},
+    misconceptions: {},
   }
 }
 
@@ -93,6 +101,15 @@ const migrations: Record<number, (state: Record<string, unknown>) => Record<stri
     ...state,
     mockAttempts: Array.isArray(state.mockAttempts) ? state.mockAttempts : [],
     extraFacts: Array.isArray(state.extraFacts) ? state.extraFacts : [],
+  }),
+  // 2 to 3: the Learn module. Three empty maps, so a phone holding practice
+  // progress from before the module existed opens on the topic map with every
+  // lesson at not started rather than being reset.
+  2: (state) => ({
+    ...state,
+    lessons: asRecord(state.lessons),
+    topics: asRecord(state.topics),
+    misconceptions: asRecord(state.misconceptions),
   }),
 }
 
@@ -228,6 +245,51 @@ function coerceExtraFact(value: unknown): ExtraFact | null {
   }
 }
 
+const LESSON_STATUSES: LessonStatus[] = ['not-started', 'in-progress', 'complete']
+const GUIDANCE_TIERS: GuidanceTier[] = ['full', 'faded', 'minimal']
+
+function counter(value: unknown): number {
+  return typeof value === 'number' && value >= 0 && Number.isFinite(value) ? Math.floor(value) : 0
+}
+
+function isoOrNull(value: unknown): string | null {
+  return typeof value === 'string' && isValidISODate(value) ? value : null
+}
+
+function coerceLesson(value: unknown): LessonProgress {
+  const raw = asRecord(value)
+  const status = LESSON_STATUSES.find((option) => option === raw.status) ?? 'not-started'
+  const step = typeof raw.currentStep === 'number' ? Math.floor(raw.currentStep) : 1
+  return {
+    status,
+    // The player has nine steps and clamping here means a lesson written by a
+    // later version cannot reopen on a step this build cannot render.
+    currentStep: Math.min(9, Math.max(1, Number.isFinite(step) ? step : 1)),
+    produceAttempts: counter(raw.produceAttempts),
+    aided: raw.aided === true,
+    passedUnaided: raw.passedUnaided === true,
+    completedAt: isoOrNull(raw.completedAt),
+  }
+}
+
+function coerceTopic(value: unknown): TopicProgress {
+  const raw = asRecord(value)
+  return {
+    fluencyStreak: counter(raw.fluencyStreak),
+    cleanCompletions: counter(raw.cleanCompletions),
+    guidanceTier: GUIDANCE_TIERS.find((option) => option === raw.guidanceTier) ?? 'full',
+  }
+}
+
+function coerceMisconception(value: unknown): MisconceptionProgress {
+  const raw = asRecord(value)
+  return {
+    fellFor: counter(raw.fellFor),
+    lastFellAt: isoOrNull(raw.lastFellAt),
+    clearedAt: isoOrNull(raw.clearedAt),
+  }
+}
+
 /** Turns anything at all into a valid state. Unknown fields are dropped. */
 export function coerceState(value: unknown): ProgressState {
   const raw = migrate(asRecord(value))
@@ -252,6 +314,17 @@ export function coerceState(value: unknown): ProgressState {
     .map(coerceExtraFact)
     .filter((fact): fact is ExtraFact => fact !== null)
 
+  const lessons: Record<string, LessonProgress> = {}
+  for (const [id, entry] of Object.entries(asRecord(raw.lessons))) lessons[id] = coerceLesson(entry)
+
+  const topics: Record<string, TopicProgress> = {}
+  for (const [id, entry] of Object.entries(asRecord(raw.topics))) topics[id] = coerceTopic(entry)
+
+  const misconceptions: Record<string, MisconceptionProgress> = {}
+  for (const [id, entry] of Object.entries(asRecord(raw.misconceptions))) {
+    misconceptions[id] = coerceMisconception(entry)
+  }
+
   return {
     schemaVersion: SCHEMA_VERSION,
     settings: coerceSettings(raw.settings),
@@ -260,6 +333,9 @@ export function coerceState(value: unknown): ProgressState {
     sessions,
     mockAttempts,
     extraFacts,
+    lessons,
+    topics,
+    misconceptions,
   }
 }
 
@@ -271,6 +347,7 @@ export type ImportSummary = {
   sessions: number
   mockAttempts: number
   extraFacts: number
+  lessons: number
   schemaVersion: number
 }
 
@@ -281,6 +358,7 @@ export function summarise(state: ProgressState): ImportSummary {
     sessions: state.sessions.length,
     mockAttempts: state.mockAttempts.length,
     extraFacts: state.extraFacts.length,
+    lessons: Object.values(state.lessons).filter((lesson) => lesson.status !== 'not-started').length,
     schemaVersion: state.schemaVersion,
   }
 }

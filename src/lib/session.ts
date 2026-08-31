@@ -15,6 +15,11 @@ export type DrillFilters = {
   /** null means every section, which is the interleaved default. */
   sectionId: number | null
   priorityOnly: boolean
+  /**
+   * An explicit set of fact ids, used by a lesson handoff so that a drill
+   * started from a lesson serves that lesson's facts and nothing else.
+   */
+  factIds?: string[] | null
 }
 
 export type DrillQueue = {
@@ -80,7 +85,11 @@ export function buildDrillQueue(
   today: string,
   options: { includeNotDue?: boolean } = {},
 ): DrillQueue {
+  const wanted = filters.factIds ? new Set(filters.factIds) : null
   const pool = facts.filter((fact) => {
+    // A lesson names its facts outright, and the section and priority filters
+    // do not apply to a set that was chosen deliberately.
+    if (wanted) return wanted.has(fact.id)
     if (filters.sectionId !== null && fact.section !== filters.sectionId) return false
     if (filters.priorityOnly && !fact.isPriority) return false
     return true

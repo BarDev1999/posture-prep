@@ -62,6 +62,46 @@ export type ExtraFact = {
   sourceName: string
 }
 
+// -------------------------------------------------------------- learn module
+
+export type LessonStatus = 'not-started' | 'in-progress' | 'complete'
+
+/**
+ * How much instructional support a topic still shows. Support that helps a
+ * novice becomes noise to someone who no longer needs it, so this rises with
+ * clean completions rather than staying where the learner first met it.
+ */
+export type GuidanceTier = 'full' | 'faded' | 'minimal'
+
+export type LessonProgress = {
+  status: LessonStatus
+  /** Which of the nine steps the player reopens on, 1 to 9. */
+  currentStep: number
+  /** Attempts at step 7, free production. */
+  produceAttempts: number
+  /** True once a failed step 7 has dropped the learner back to step 6. */
+  aided: boolean
+  /** Step 7 passed with no drop back to the Parsons fallback. */
+  passedUnaided: boolean
+  completedAt: string | null
+}
+
+export type TopicProgress = {
+  /** Consecutive lessons finished with an unaided step 7. Two means fluent. */
+  fluencyStreak: number
+  /** Total lessons finished with an unaided step 7. Drives the guidance tier. */
+  cleanCompletions: number
+  guidanceTier: GuidanceTier
+}
+
+export type MisconceptionProgress = {
+  /** Times a trap on this misconception was answered wrongly. */
+  fellFor: number
+  lastFellAt: string | null
+  /** Day a later trap on the same misconception was answered correctly. */
+  clearedAt: string | null
+}
+
 export type Settings = {
   level: Level
   /** Exam day, YYYY-MM-DD. */
@@ -82,4 +122,10 @@ export type ProgressState = {
   mockAttempts: MockAttempt[]
   /** Facts added after the build, merged into the deck at runtime. */
   extraFacts: ExtraFact[]
+  /** Learn module, keyed by lesson id. */
+  lessons: Record<string, LessonProgress>
+  /** Learn module, keyed by topic id. */
+  topics: Record<string, TopicProgress>
+  /** Learn module, keyed by misconception id. */
+  misconceptions: Record<string, MisconceptionProgress>
 }

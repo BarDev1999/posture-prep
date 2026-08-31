@@ -18,6 +18,12 @@ import type { Level, QuestionProgress } from '../types/progress.ts'
 export type PracticeFilters = {
   sectionId: number | null
   formats: QuestionFormat[] | null
+  /**
+   * An explicit set of question ids, used by a lesson handoff. This is blocked
+   * practice: the same small set, repeated, rather than the interleaved daily
+   * pool. Null means no id filter.
+   */
+  questionIds?: string[] | null
 }
 
 /** True when every medium question in a section has been answered correctly. */
@@ -93,7 +99,11 @@ export function buildPracticeQueue(
   filters: PracticeFilters,
   today: string,
 ): PracticeQueue {
+  const wanted = filters.questionIds ? new Set(filters.questionIds) : null
   const pool = questions.filter((question) => {
+    // A lesson handoff names its questions outright. Level and format filters
+    // are not applied to them: the lesson decided they were the right ones.
+    if (wanted) return wanted.has(question.id)
     if (filters.sectionId !== null && question.section !== filters.sectionId) return false
     if (filters.formats && !filters.formats.includes(question.format)) return false
     return allowsQuestion(question, level, progress, questions)

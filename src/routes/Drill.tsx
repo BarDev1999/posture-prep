@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Markdown } from '../components/Markdown.tsx'
+import { getLesson } from '../data/lessons/index.ts'
 import { sections } from '../lib/content.ts'
 import { mergeDeck } from '../lib/deck.ts'
 import { todayISO } from '../lib/date.ts'
@@ -39,6 +40,12 @@ export function Drill() {
 
   const { sectionFilter, priorityOnly } = progress.settings
 
+  // A lesson handoff arrives as ?lesson=L4 and pins the drill to that lesson's
+  // facts, ignoring the section and priority filters.
+  const [search, setSearch] = useSearchParams()
+  const lesson = getLesson(search.get('lesson') ?? '')
+  const lessonFactIds = lesson?.practice.factIds ?? null
+
   const [queue, setQueue] = useState<string[]>([])
   const [index, setIndex] = useState(0)
   const [revealed, setRevealed] = useState(false)
@@ -57,9 +64,11 @@ export function Drill() {
     const built = buildDrillQueue(
       facts,
       factProgressRef.current,
-      { sectionId: sectionFilter, priorityOnly },
+      { sectionId: sectionFilter, priorityOnly, factIds: lessonFactIds },
       today,
-      { includeNotDue: drillAhead },
+      // A lesson's fact set is tiny, so it is always served in full rather than
+      // filtered down to the cards that happen to be due today.
+      { includeNotDue: drillAhead || lessonFactIds !== null },
     )
     setQueue(built.order)
     setIndex(0)
@@ -67,12 +76,13 @@ export function Drill() {
     setDragX(0)
     // mergeDeck returns a stable reference, so listing the deck here rebuilds
     // the queue when facts are imported without looping on every render.
-  }, [facts, sectionFilter, priorityOnly, today, drillAhead])
+  }, [facts, sectionFilter, priorityOnly, today, drillAhead, lessonFactIds])
 
   // Live counters read current progress, so "due today" falls as cards are rated.
   const live = useMemo(
-    () => buildDrillQueue(facts, progress.facts, { sectionId: sectionFilter, priorityOnly }, today),
-    [progress.facts, sectionFilter, priorityOnly, today],
+    () =>
+      buildDrillQueue(facts, progress.facts, { sectionId: sectionFilter, priorityOnly, factIds: lessonFactIds }, today),
+    [facts, progress.facts, sectionFilter, priorityOnly, today, lessonFactIds],
   )
 
   const cardStartedAt = useRef(Date.now())
@@ -175,7 +185,24 @@ export function Drill() {
 
   return (
     <div className="mx-auto flex h-full w-full max-w-lg flex-col">
-      <div className="shrink-0 border-b border-rule bg-sheet px-4 py-2">
+      {lesson ? (
+        <div className="shrink-0 border-b border-rule bg-sheet px-4 py-2">
+          <p className="eyebrow">Blocked drill</p>
+          <p className="mt-1 text-sm leading-relaxed">
+            The {lesson.practice.factIds.length} fact{lesson.practice.factIds.length === 1 ? '' : 's'} tagged to lesson{' '}
+            {lesson.number}, {lesson.title}.
+          </p>
+          <button
+            type="button"
+            onClick={() => setSearch({})}
+            className="mt-2 min-h-11 w-full rounded-sm border border-rule text-sm text-muted hover:text-ink"
+          >
+            Drill everything instead
+          </button>
+        </div>
+      ) : null}
+
+      <div className={`shrink-0 border-b border-rule bg-sheet px-4 py-2 ${lesson ? 'hidden' : ''}`}>
         <div className="flex items-center justify-between gap-2">
           <label className="flex min-h-11 items-center gap-2 text-sm">
             <input

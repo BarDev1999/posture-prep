@@ -11,6 +11,7 @@ import type {
   ThemeSetting,
 } from '../types/progress.ts'
 import { applyRating, newFactProgress } from '../lib/leitner.ts'
+import { NEW_LESSON_PROGRESS, NEW_TOPIC_PROGRESS, TOTAL_STEPS, guidanceTier } from '../lib/learn.ts'
 import { defaultState, loadState, saveState } from '../lib/storage.ts'
 
 /**
@@ -38,6 +39,10 @@ export type Action =
       elapsedMs: number
     }
   | { type: 'clear-review'; questionId: string }
+  | { type: 'lesson-step'; lessonId: string; step: number }
+  | { type: 'lesson-produce'; lessonId: string; passed: boolean }
+  | { type: 'lesson-trap'; misconceptionId: string; correct: boolean; today: string }
+  | { type: 'lesson-complete'; lessonId: string; topicId: string; today: string }
   | { type: 'save-mock'; attempt: MockAttempt }
   | { type: 'import-facts'; facts: ExtraFact[] }
   | { type: 'remove-imported'; sourceName: string }
@@ -101,6 +106,85 @@ export function reducer(state: ProgressState, action: Action): ProgressState {
       return {
         ...state,
         questions: { ...state.questions, [action.questionId]: { ...previous, inReviewQueue: false } },
+      }
+    }
+    case 'lesson-step': {
+      const previous = state.lessons[action.lessonId] ?? NEW_LESSON_PROGRESS
+      const step = Math.min(TOTAL_STEPS, Math.max(1, action.step))
+      if (previous.currentStep === step && previous.status !== 'not-started') return state
+      return {
+        ...state,
+        lessons: {
+          ...state.lessons,
+          [action.lessonId]: {
+            ...previous,
+            currentStep: step,
+            // A completed lesson stays completed while it is being reread.
+            status: previous.status === 'complete' ? 'complete' : 'in-progress',
+          },
+        },
+      }
+    }
+    case 'lesson-produce': {
+      const previous = state.lessons[action.lessonId] ?? NEW_LESSON_PROGRESS
+      // Unaided means the learner never had to fall back to the Parsons help.
+      const aided = previous.aided || !action.passed
+      return {
+        ...state,
+        lessons: {
+          ...state.lessons,
+          [action.lessonId]: {
+            ...previous,
+            status: previous.status === 'complete' ? 'complete' : 'in-progress',
+            produceAttempts: previous.produceAttempts + 1,
+            aided,
+            passedUnaided: action.passed && !aided,
+          },
+        },
+      }
+    }
+    case 'lesson-trap': {
+      const previous = state.misconceptions[action.misconceptionId] ?? {
+        fellFor: 0,
+        lastFellAt: null,
+        clearedAt: null,
+      }
+      const next = action.correct
+        ? {
+            ...previous,
+            // Cleared only means something for a misconception they once fell for.
+            clearedAt: previous.fellFor > 0 ? action.today : previous.clearedAt,
+          }
+        : { fellFor: previous.fellFor + 1, lastFellAt: action.today, clearedAt: null }
+      return { ...state, misconceptions: { ...state.misconceptions, [action.misconceptionId]: next } }
+    }
+    case 'lesson-complete': {
+      const previous = state.lessons[action.lessonId] ?? NEW_LESSON_PROGRESS
+      // Reaching the end of a lesson twice must not count twice towards fluency.
+      if (previous.status === 'complete') return state
+      const topic = state.topics[action.topicId] ?? NEW_TOPIC_PROGRESS
+      const clean = previous.passedUnaided
+      const cleanCompletions = topic.cleanCompletions + (clean ? 1 : 0)
+      return {
+        ...state,
+        lessons: {
+          ...state.lessons,
+          [action.lessonId]: {
+            ...previous,
+            status: 'complete',
+            currentStep: TOTAL_STEPS,
+            completedAt: action.today,
+          },
+        },
+        topics: {
+          ...state.topics,
+          [action.topicId]: {
+            // Consecutive, so one aided lesson resets it. Two in a row is fluent.
+            fluencyStreak: clean ? topic.fluencyStreak + 1 : 0,
+            cleanCompletions,
+            guidanceTier: guidanceTier(cleanCompletions),
+          },
+        },
       }
     }
     case 'save-mock':

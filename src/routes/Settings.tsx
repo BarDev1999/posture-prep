@@ -223,6 +223,7 @@ function ExportImport({ state }: { state: ProgressState }) {
                   ['sessions', current.sessions, summarise(pending.state).sessions],
                   ['mock attempts', current.mockAttempts, summarise(pending.state).mockAttempts],
                   ['imported facts', current.extraFacts, summarise(pending.state).extraFacts],
+                  ['lessons started', current.lessons, summarise(pending.state).lessons],
                 ] as const
               ).map(([label, before, after]) => (
                 <tr key={label}>

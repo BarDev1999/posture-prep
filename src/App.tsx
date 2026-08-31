@@ -4,6 +4,8 @@ import { AppShell } from './components/AppShell.tsx'
 import { Home } from './routes/Home.tsx'
 import { Drill } from './routes/Drill.tsx'
 import { Practice } from './routes/Practice.tsx'
+import { Learn } from './routes/Learn.tsx'
+import { Lesson } from './routes/Lesson.tsx'
 import { Article, Library } from './routes/Library.tsx'
 import { Mock } from './routes/Mock.tsx'
 import { Explain } from './routes/Explain.tsx'
@@ -29,6 +31,8 @@ export function App() {
             <Route path="/" element={<Home />} />
             <Route path="/drill" element={<Drill />} />
             <Route path="/practice" element={<Practice />} />
+            <Route path="/learn" element={<Learn />} />
+            <Route path="/learn/:lessonId" element={<Lesson />} />
             <Route
               path="/sandbox"
               element={
