@@ -5,6 +5,7 @@ import { Markdown } from '../components/Markdown.tsx'
 import { sections } from '../lib/content.ts'
 import { mergeDeck } from '../lib/deck.ts'
 import { todayISO } from '../lib/date.ts'
+import { makeCloze } from '../lib/cloze.ts'
 import { boxInterval, dueDate } from '../lib/leitner.ts'
 import { buildDrillQueue, requeueMissed } from '../lib/session.ts'
 import { useAppDispatch, useProgress } from '../state/AppContext.tsx'
@@ -164,6 +165,12 @@ export function Drill() {
 
   const remaining = Math.max(0, queue.length - index)
   const factProgress = fact ? progress.facts[fact.id] : undefined
+  // Cloze deletion is a level 1 mechanic. A fact with no term worth blanking
+  // falls back to free recall rather than blanking a word that gives nothing away.
+  const cloze = useMemo(
+    () => (fact && progress.settings.level === 1 ? makeCloze(fact.front, fact.back) : null),
+    [fact, progress.settings.level],
+  )
   const swipeHint = revealed ? (dragX > 0 ? 'Got it' : dragX < 0 ? 'Missed it' : null) : dragX !== 0 ? 'Reveal' : null
 
   return (
@@ -249,6 +256,21 @@ export function Drill() {
                   {revealed ? (
                     <div className="reveal mt-4 border-t border-rule pt-3">
                       <Markdown>{fact.back}</Markdown>
+                    </div>
+                  ) : cloze ? (
+                    /* Level 1 only. Filling one blank is an easier retrieval step
+                       than free recall, which is what material seen for the first
+                       time needs. */
+                    <div className="mt-4 border-t border-rule pt-3">
+                      <p className="eyebrow">Fill the blank</p>
+                      <p className="mt-2 leading-relaxed">
+                        {cloze.before}
+                        <span className="mx-0.5 border-b-2 border-accent px-6 align-baseline text-transparent select-none">
+                          {cloze.answer}
+                        </span>
+                        {cloze.after}
+                      </p>
+                      <p className="mt-3 text-sm text-faint">Say the missing term, then reveal.</p>
                     </div>
                   ) : (
                     <p className="mt-4 text-sm text-faint">

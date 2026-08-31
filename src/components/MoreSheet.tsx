@@ -85,9 +85,9 @@ export function MoreSheet({ open, onClose }: { open: boolean; onClose: () => voi
             })}
           </ul>
           <p className="mt-2 px-1 text-xs leading-relaxed text-faint">
-            Changing level never touches progress. The fact drill reads the same at every level, the level
-            decides which questions practice serves, and the mock exam ignores it because a mock that
-            served only easy questions would not be a mock.
+            Changing level never touches progress. Level 1 blanks a term out of each fact instead of
+            asking for free recall, the level decides which questions practice serves, and the mock
+            exam ignores it because a mock that served only easy questions would not be a mock.
           </p>
         </section>
 

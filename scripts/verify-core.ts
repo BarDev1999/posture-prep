@@ -33,6 +33,7 @@ import {
   scorePaper,
 } from '../src/lib/mock.ts'
 import { keyPoints } from '../src/lib/keypoints.ts'
+import { clozeSource, makeCloze } from '../src/lib/cloze.ts'
 import { parseFactMarkdown } from '../src/lib/importFacts.ts'
 import { mergeDeck } from '../src/lib/deck.ts'
 import {
@@ -653,6 +654,44 @@ const partialDeck = parseFactMarkdown(
 )
 check('a fact with no answer is skipped, not fatal', partialDeck.ok && partialDeck.facts.length === 1)
 check('and the skip is reported', partialDeck.ok && partialDeck.warnings.some((w) => w.includes('no answer')))
+
+section('Cloze deletion, level 1')
+
+const clozes = content.facts.map((fact) => ({ fact, cloze: makeCloze(fact.front, fact.back) }))
+const withCloze = clozes.filter((entry) => entry.cloze !== null)
+check(
+  'most facts can be turned into a blank to fill',
+  withCloze.length >= 45,
+  `${withCloze.length} of ${content.facts.length}`,
+)
+check(
+  'the blank always comes out of the real answer',
+  withCloze.every(
+    ({ fact, cloze }) => cloze !== null && `${cloze.before}${cloze.answer}${cloze.after}` === clozeSource(fact.back),
+  ),
+)
+check(
+  'the cloze sentence carries no stray markdown',
+  withCloze.every(({ cloze }) => !`${cloze?.before ?? ''}${cloze?.after ?? ''}`.includes('`')),
+)
+check(
+  'the removed term is never already in the question',
+  withCloze.every(({ fact, cloze }) => !fact.front.toLowerCase().includes((cloze?.answer ?? '').toLowerCase())),
+)
+check('no blank is a single character', withCloze.every(({ cloze }) => (cloze?.answer.length ?? 0) >= 2))
+check(
+  'the sentence still has context around the blank',
+  withCloze.every(({ cloze }) => `${cloze?.before ?? ''}${cloze?.after ?? ''}`.trim().split(/\s+/).length >= 4),
+)
+
+const clozeOne = makeCloze('What is the only way to test for NULL?', 'Use `IS NULL` or `IS NOT NULL` on the column.')
+check('a backticked identifier is preferred', clozeOne?.answer === 'IS NOT NULL' || clozeOne?.answer === 'IS NULL')
+check(
+  'a term the question already gave away is skipped',
+  makeCloze('What does CAP_SYS_ADMIN grant?', 'CAP_SYS_ADMIN grants effectively everything a host root user can do.')
+    ?.answer !== 'CAP_SYS_ADMIN',
+)
+check('a one word answer yields no blank', makeCloze('Question?', 'Yes.') === null)
 
 // --------------------------------------------------------------------- done
 

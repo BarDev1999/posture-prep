@@ -11,7 +11,8 @@ export const LEVELS: LevelInfo[] = [
   {
     value: 1,
     name: 'From zero',
-    blurb: 'For material never seen before. Definitions first, two options per question, hints on.',
+    blurb:
+      'For material never seen before. A blank to fill instead of free recall, two options per question, and the reference article open by default.',
   },
   {
     value: 2,
