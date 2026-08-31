@@ -98,7 +98,7 @@ src/components/learn/  lesson diagrams and the Parsons widget
 src/data/          content.json, generated, not committed
 src/data/curriculum.ts     the 58 lesson graph and its prerequisites
 src/data/misconceptions.ts the documented misconception list every trap maps to
-src/data/lessons/          one file per lesson
+src/data/lessons/          one file per lesson, plus one bundle per topic
 ```
 
 ## The Learn module
@@ -130,7 +130,21 @@ in a later lesson should fail the build rather than blank a screen on a phone.
 Every factual claim traces to files A to D through the `sources` array on each lesson.
 `npm run verify:lessons` resolves every source to a fact id, question id, article id or
 a heading that really exists in one of the four files, checks that every trap names a
-documented misconception, and runs every model query against the seeded database.
+documented misconception, and runs every model query against the seeded database. It
+also pins the arithmetic: every row count and total quoted in lesson prose is asserted
+against the real database, so a lesson cannot drift away from the data it describes.
+
+Section 5 of the brief lists twelve specific SQL traps. They map one to one onto lessons
+3 to 14, one trap per lesson, and the verifier fails if any is unused or used twice.
+Lessons 1 and 2 come before that material and name one of the four documented
+misconception *categories* instead, because no specific trap applies to a lesson that
+has not introduced a WHERE clause yet.
+
+**Chunking.** The first chunk carries the curriculum graph, the misconception list and
+the id of every written lesson: enough to draw the topic map and decide what is locked.
+The lessons themselves are one chunk per topic, fetched when a lesson is opened, and the
+player and the SQLite engine are separate again on top of that. Opening the topic map
+downloads no lesson prose at all.
 
 ## Build stages
 
@@ -150,8 +164,11 @@ The Learn module has its own stages, set by the second spec.
 
 - **Stage A, done.** Curriculum graph, lesson data format, topic map, the nine step
   lesson player, progress schema version 3 with its migration, and lessons 1 to 6.
-- **Stage B.** The full Parsons widget: drag and drop on top of the tap to place
-  interaction that ships here, plus indentation for Python. Then lessons 7 to 14.
+- **Stage B, done.** Lessons 7 to 14, the JOIN and GROUP BY block. Lessons split
+  one chunk per topic and fetched on the way into a lesson. Drag and drop was
+  dropped on purpose: tap to select then tap to place is the final interaction,
+  because it is the one that works one handed. Python indentation comes with the
+  Python lessons.
 - **Stage C.** Trace stepper, then the Python lessons, 15 to 23.
 - **Stage D.** Rule builder, then AI security, 24 to 34.
 - **Stage E.** Sections 3, 4 and 5, lessons 35 to 58.

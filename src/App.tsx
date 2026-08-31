@@ -5,7 +5,6 @@ import { Home } from './routes/Home.tsx'
 import { Drill } from './routes/Drill.tsx'
 import { Practice } from './routes/Practice.tsx'
 import { Learn } from './routes/Learn.tsx'
-import { Lesson } from './routes/Lesson.tsx'
 import { Article, Library } from './routes/Library.tsx'
 import { Mock } from './routes/Mock.tsx'
 import { Explain } from './routes/Explain.tsx'
@@ -16,6 +15,11 @@ import { AppProvider } from './state/AppContext.tsx'
 // offline use but only fetched when the sandbox is actually opened, so the
 // first paint on a phone does not wait for it.
 const Sandbox = lazy(() => import('./routes/Sandbox.tsx'))
+
+// The player is only reachable from the topic map, and it pulls in the SQL
+// grader and the result table. Splitting it keeps all of that out of the chunk
+// that paints the home screen.
+const Lesson = lazy(() => import('./routes/Lesson.tsx'))
 
 /**
  * Hash routing on purpose. The app is served from a GitHub Pages subpath where
@@ -32,7 +36,14 @@ export function App() {
             <Route path="/drill" element={<Drill />} />
             <Route path="/practice" element={<Practice />} />
             <Route path="/learn" element={<Learn />} />
-            <Route path="/learn/:lessonId" element={<Lesson />} />
+            <Route
+              path="/learn/:lessonId"
+              element={
+                <Suspense fallback={<Loading label="Loading the lesson" />}>
+                  <Lesson />
+                </Suspense>
+              }
+            />
             <Route
               path="/sandbox"
               element={

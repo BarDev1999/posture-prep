@@ -11,7 +11,6 @@ export const lesson: Lesson = {
   minutes: 14,
   difficulty: 'medium',
   sources: ['F3', 'Q1.3', 'Q1.4', 'Q1.6'],
-  practice: { questionIds: ['Q1.3', 'Q1.4', 'Q1.6'], factIds: ['F3'] },
 
   steps: {
     vocabulary: [

@@ -31,9 +31,10 @@ export type VocabTerm = {
  * Diagrams are described, not drawn, so the renderer can size them for a 380px
  * screen and colour them from the theme. Three kinds cover the SQL block:
  *
- *   pipeline  stages of query processing with the row count shrinking
+ *   pipeline  stages of query processing, with the row count changing
  *   rows      a table as a grid, optionally with a top N bracket
  *   buckets   a set of rows split three ways, for three valued logic
+ *   link      two tables side by side, joined on a key column
  */
 export type Diagram =
   | {
@@ -57,6 +58,15 @@ export type Diagram =
       kind: 'buckets'
       caption: string
       buckets: { label: string; count: number; note: string; kept: boolean }[]
+    }
+  | {
+      kind: 'link'
+      caption: string
+      left: { title: string; columns: string[]; rows: string[][] }
+      right: { title: string; columns: string[]; rows: string[][] }
+      /** Index of the key column in each table. The link is drawn between them. */
+      leftKey: number
+      rightKey: number
     }
 
 export type MentalModel = {
@@ -199,8 +209,6 @@ export type Lesson = {
   sources: string[]
   /** Set when a lesson needs a fact the source files do not contain. */
   needsReview?: string
-  /** What the step 9 handoff sends the learner into. */
-  practice: { questionIds: string[]; factIds: string[] }
   steps: LessonSteps
 }
 

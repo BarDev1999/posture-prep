@@ -5,7 +5,8 @@ import { ResultTable } from '../components/ResultTable.tsx'
 import { Diagram } from '../components/learn/Diagram.tsx'
 import { ParsonsWidget } from '../components/learn/ParsonsWidget.tsx'
 import { curriculumEntry, getTopic } from '../data/curriculum.ts'
-import { getLesson } from '../data/lessons/index.ts'
+import type { CurriculumEntry } from '../data/curriculum.ts'
+import { loadLesson } from '../data/lessons/index.ts'
 import { getMisconception } from '../data/misconceptions.ts'
 import { content, getFact, getQuestion } from '../lib/content.ts'
 import { todayISO } from '../lib/date.ts'
@@ -33,7 +34,7 @@ import type { FadeExercise, Lesson, ProduceExercise, TrapExercise, VocabTerm, Wo
  * worked example wants its self explanation prompts opened, and the exercises
  * want a right answer. Back is always allowed, including back out of the lesson.
  */
-export function Lesson() {
+export default function Lesson() {
   const { lessonId = '' } = useParams()
   // Keyed on the lesson id so that moving from one lesson to another gets a
   // fresh player. React Router reuses this element across the two, and without
@@ -48,9 +49,28 @@ function LessonPlayer({ lessonId }: { lessonId: string }) {
   const today = todayISO()
 
   const entry = curriculumEntry(lessonId)
-  const lesson = getLesson(lessonId)
   const stored = lessonProgress(progress.lessons, lessonId)
   const state = entry ? lessonState(entry, progress.lessons) : 'locked'
+
+  // A topic's lessons are their own chunk, fetched on the way in. The component
+  // is keyed on the lesson id, so this runs once per lesson opened and the
+  // second lesson in the same topic is served from the cache in the loader.
+  const [lesson, setLesson] = useState<Lesson | null>(null)
+  const [loadFailed, setLoadFailed] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    loadLesson(lessonId).then(
+      (loaded) => {
+        if (!cancelled) setLesson(loaded ?? null)
+      },
+      () => {
+        if (!cancelled) setLoadFailed(true)
+      },
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [lessonId])
 
   const [step, setStep] = useState(() => Math.min(TOTAL_STEPS, Math.max(1, stored.currentStep)))
   const [openPrompts, setOpenPrompts] = useState<number[]>([])
@@ -113,7 +133,17 @@ function LessonPlayer({ lessonId }: { lessonId: string }) {
   }
 
   if (!lesson) {
-    return <Blocked title={entry.title} detail="This lesson is unlocked but has not been written yet." />
+    if (loadFailed) {
+      return <Blocked title={entry.title} detail="This lesson could not be loaded. Check the connection and try again." />
+    }
+    if (state === 'unwritten') {
+      return <Blocked title={entry.title} detail="This lesson is unlocked but has not been written yet." />
+    }
+    return (
+      <p className="mx-auto w-full max-w-2xl px-4 py-8 text-sm text-muted" role="status">
+        Loading lesson {entry.number}
+      </p>
+    )
   }
 
   const stepKey = stepKeyAt(step)
@@ -253,7 +283,9 @@ function LessonPlayer({ lessonId }: { lessonId: string }) {
           />
         ) : null}
 
-        {stepKey === 'handoff' ? <HandoffStep lesson={lesson} unaided={stored.passedUnaided} /> : null}
+        {stepKey === 'handoff' ? (
+          <HandoffStep lesson={lesson} entry={entry} unaided={stored.passedUnaided} />
+        ) : null}
       </div>
 
       <div className="mt-8 flex gap-2 border-t border-rule pt-4">
@@ -742,11 +774,19 @@ function TrapStep({
 
 // ------------------------------------------------------------------- step 9
 
-function HandoffStep({ lesson, unaided }: { lesson: Lesson; unaided: boolean }) {
+function HandoffStep({
+  lesson,
+  entry,
+  unaided,
+}: {
+  lesson: Lesson
+  entry: CurriculumEntry
+  unaided: boolean
+}) {
   const misconception = getMisconception(lesson.steps.trap.misconceptionId)
   const topic = getTopic(lesson.topicId)
-  const questions = lesson.practice.questionIds.map(getQuestion).filter((question) => question !== undefined)
-  const facts = lesson.practice.factIds.map(getFact).filter((fact) => fact !== undefined)
+  const questions = entry.practice.questionIds.map(getQuestion).filter((question) => question !== undefined)
+  const facts = entry.practice.factIds.map(getFact).filter((fact) => fact !== undefined)
 
   return (
     <section className="mt-4">

@@ -16,8 +16,9 @@ import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
 
 import { CURRICULUM, TOPICS } from '../src/data/curriculum.ts'
-import { LESSONS } from '../src/data/lessons/index.ts'
-import { MISCONCEPTIONS, getMisconception } from '../src/data/misconceptions.ts'
+import { hasLesson, isWritten, writtenCount } from '../src/data/lessons/index.ts'
+import { lessons as SQL_LESSONS } from '../src/data/lessons/sql.ts'
+import { DOCUMENTED_SQL_TRAPS, MISCONCEPTIONS, getMisconception } from '../src/data/misconceptions.ts'
 import {
   blankedIndices,
   fadeAnswerAccepted,
@@ -36,6 +37,9 @@ import { todayISO } from '../src/lib/date.ts'
 import type { ContentBundle } from '../src/types/content.ts'
 import type { FadeExercise, Lesson, ParsonsExercise } from '../src/types/lesson.ts'
 import type { LessonProgress } from '../src/types/progress.ts'
+
+/** Every authored lesson, eagerly. In the app these arrive one chunk per topic. */
+const LESSONS = [...SQL_LESSONS]
 
 const require = createRequire(import.meta.url)
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -161,9 +165,27 @@ check(
 
 // -------------------------------------------------------------- lesson shape
 
+section('Code splitting')
+
+check(
+  'the index lists exactly the lessons the SQL bundle holds',
+  SQL_LESSONS.every((lesson) => isWritten(lesson.id)) && writtenCount('sql') === SQL_LESSONS.length,
+  `index says ${writtenCount('sql')}, bundle holds ${SQL_LESSONS.length}`,
+)
+check(
+  'every id the index claims is written resolves to a real lesson',
+  CURRICULUM.filter((entry) => hasLesson(entry.id)).every((entry) =>
+    LESSONS.some((lesson) => lesson.id === entry.id),
+  ),
+)
+check(
+  'no topic other than SQL claims written lessons yet',
+  TOPICS.filter((topic) => topic.id !== 'sql').every((topic) => writtenCount(topic.id) === 0),
+)
+
 section('Lesson shape')
 
-check('six lessons are authored', LESSONS.length === 6, `got ${LESSONS.length}`)
+check('fourteen lessons are authored', LESSONS.length === 14, `got ${LESSONS.length}`)
 check(
   'every authored lesson is in the curriculum graph',
   LESSONS.every((lesson) => ids.has(lesson.id)),
@@ -214,11 +236,17 @@ check('no authored lesson is flagged NEEDS_REVIEW', reviewNotes.length === 0, re
 
 check(
   'every practice question id exists in the bank',
-  LESSONS.every((lesson) => lesson.practice.questionIds.every((questionId) => questionIds.has(questionId))),
+  CURRICULUM.every((entry) => entry.practice.questionIds.every((questionId) => questionIds.has(questionId))),
 )
 check(
   'every practice fact id exists in the deck',
-  LESSONS.every((lesson) => lesson.practice.factIds.every((factId) => factIds.has(factId))),
+  CURRICULUM.every((entry) => entry.practice.factIds.every((factId) => factIds.has(factId))),
+)
+check(
+  'only written lessons carry a practice handoff',
+  CURRICULUM.filter((entry) => !hasLesson(entry.id)).every(
+    (entry) => entry.practice.questionIds.length === 0 && entry.practice.factIds.length === 0,
+  ),
 )
 
 section('Misconceptions')
@@ -242,8 +270,36 @@ check(
   LESSONS.every((lesson) => lesson.steps.trap.silently.length > 40),
 )
 check(
-  'no two lessons in a topic reuse the same misconception',
+  'no two lessons reuse the same misconception',
   new Set(LESSONS.map((lesson) => lesson.steps.trap.misconceptionId)).size === LESSONS.length,
+)
+
+// The brief's section 5 lists twelve specific SQL traps. They map one to one
+// onto lessons 3 to 14, which is what this pair of checks pins down.
+check('section 5 lists twelve specific SQL traps', DOCUMENTED_SQL_TRAPS.length === 12, `got ${DOCUMENTED_SQL_TRAPS.length}`)
+
+const sqlLessons = LESSONS.filter((lesson) => lesson.topicId === 'sql')
+const documentedFrom3 = sqlLessons.filter((lesson) => lesson.number >= 3)
+const notDocumented = documentedFrom3.filter(
+  (lesson) => !DOCUMENTED_SQL_TRAPS.includes(lesson.steps.trap.misconceptionId),
+)
+check(
+  'every SQL lesson from the third onward ends on one of those twelve',
+  notDocumented.length === 0,
+  notDocumented.map((lesson) => `${lesson.id}:${lesson.steps.trap.misconceptionId}`).join(', '),
+)
+
+const used = sqlLessons.map((lesson) => lesson.steps.trap.misconceptionId)
+const unused = DOCUMENTED_SQL_TRAPS.filter((id) => !used.includes(id))
+check('and all twelve are used, each exactly once', unused.length === 0, `unused: ${unused.join(', ')}`)
+
+const categoryLessons = sqlLessons.filter(
+  (lesson) => getMisconception(lesson.steps.trap.misconceptionId)?.kind === 'category',
+)
+check(
+  'only the two lessons before the traps begin fall back to a category',
+  categoryLessons.every((lesson) => lesson.number <= 2),
+  categoryLessons.map((lesson) => lesson.id).join(', '),
 )
 
 // ---------------------------------------------------------- backward fading
@@ -473,6 +529,24 @@ check('L6 step 7: 9 resources in acc-101', scalar("SELECT COUNT(*) FROM resource
 check('L3 heavy fade: 19 resolved findings', scalar("SELECT COUNT(*) FROM findings WHERE status = 'resolved'") === 19)
 check('L4 light fade: 5 identities never used', scalar('SELECT COUNT(*) FROM identities WHERE last_used_at IS NULL') === 5)
 check('L4 parsons: 15 identities have been used', scalar('SELECT COUNT(*) FROM identities WHERE last_used_at IS NOT NULL') === 15)
+
+// Stage B, the JOIN and GROUP BY block.
+check('L7 worked example: 21 resources sit in production accounts', scalar("SELECT COUNT(*) FROM resources WHERE account_id IN (SELECT account_id FROM cloud_accounts WHERE environment = 'prod')") === 21)
+check("L7 trap: IS NOT runs here and returns the right 31 rows", scalar("SELECT COUNT(*) FROM resources WHERE account_id IS NOT 'acc-101'") === 31)
+check('L8 model: 80 join rows over 32 distinct resources, 8 dropped', scalar('SELECT COUNT(*) FROM resources r JOIN findings f ON f.resource_id = r.resource_id') === 80 && scalar('SELECT COUNT(DISTINCT r.resource_id) FROM resources r JOIN findings f ON f.resource_id = r.resource_id') === 32)
+check('L8 trap: an inner join searching for absence returns zero', scalar("SELECT COUNT(*) FROM resources r JOIN findings f ON f.resource_id = r.resource_id WHERE r.resource_type = 'ec2_instance' AND f.finding_id IS NULL") === 0)
+check('L9 worked example: the condition in ON gives 45 rows', scalar("SELECT COUNT(*) FROM resources r LEFT JOIN findings f ON f.resource_id = r.resource_id AND f.severity = 'critical'") === 45)
+check('L9 trap: the same condition in WHERE gives 26, an inner join', scalar("SELECT COUNT(*) FROM resources r LEFT JOIN findings f ON f.resource_id = r.resource_id WHERE f.severity = 'critical'") === 26 && scalar("SELECT COUNT(*) FROM findings WHERE severity = 'critical'") === 26)
+check('L10 worked example: 2 ec2 instances have no findings', scalar("SELECT COUNT(*) FROM resources r LEFT JOIN findings f ON f.resource_id = r.resource_id WHERE r.resource_type = 'ec2_instance' AND f.finding_id IS NULL") === 2)
+check('L11 model: 4 severity piles from 49 open findings', scalar("SELECT COUNT(*) FROM (SELECT severity FROM findings WHERE status = 'open' GROUP BY severity)") === 4)
+check('L11 trap: grouping by severity alone yields 4 rows, not the 11 real pairs', scalar('SELECT COUNT(*) FROM (SELECT severity, status FROM findings GROUP BY severity)') === 4 && scalar('SELECT COUNT(*) FROM (SELECT severity, status FROM findings GROUP BY severity, status)') === 11)
+check('L12 model: the three counts answer 40, 32 and 2', scalar('SELECT COUNT(*) FROM resources') === 40 && scalar('SELECT COUNT(is_public) FROM resources') === 32 && scalar('SELECT COUNT(DISTINCT is_public) FROM resources') === 2)
+check('L12 heavy fade: 20 identities, 15 ever used', scalar('SELECT COUNT(*) FROM identities') === 20 && scalar('SELECT COUNT(last_used_at) FROM identities') === 15)
+check('L13 worked example: 2 severities hold more than 10 open findings', scalar("SELECT COUNT(*) FROM (SELECT severity FROM findings WHERE status = 'open' GROUP BY severity HAVING COUNT(*) > 10)") === 2)
+check('L14 model: res-01 fans out to 27 rows from 9 findings and 3 CVEs', scalar("SELECT COUNT(*) FROM resources r JOIN findings f ON f.resource_id = r.resource_id JOIN vulnerabilities v ON v.resource_id = r.resource_id WHERE r.resource_id = 'res-01'") === 27)
+check('L14 trap: SUM over that fan out reports 245.7 instead of 27.3', Math.round(Number(scalar("SELECT SUM(v.cvss_score) FROM resources r JOIN findings f ON f.resource_id = r.resource_id JOIN vulnerabilities v ON v.resource_id = r.resource_id WHERE r.resource_id = 'res-01'")) * 10) / 10 === 245.7 && Number(scalar("SELECT SUM(cvss_score) FROM vulnerabilities WHERE resource_id = 'res-01'")) === 27.3)
+check('L14 produce: res-03 totals 19.8, and 59.4 through the findings join', Number(scalar("SELECT SUM(cvss_score) FROM vulnerabilities WHERE resource_id = 'res-03'")) === 19.8 && Math.round(Number(scalar("SELECT SUM(v.cvss_score) FROM resources r JOIN findings f ON f.resource_id = r.resource_id JOIN vulnerabilities v ON v.resource_id = r.resource_id WHERE r.resource_id = 'res-03'")) * 10) / 10 === 59.4)
+check('L14 heavy fade: 263.8 honestly, 802.7 through the double join', Number(scalar('SELECT SUM(cvss_score) FROM vulnerabilities')) === 263.8 && Math.round(Number(scalar('SELECT SUM(v.cvss_score) FROM resources r JOIN findings f ON f.resource_id = r.resource_id JOIN vulnerabilities v ON v.resource_id = r.resource_id')) * 10) / 10 === 802.7)
 
 // --------------------------------------------------------------------- done
 

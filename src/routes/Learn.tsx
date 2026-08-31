@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { CURRICULUM, TOPICS, curriculumEntry, lessonsInTopic } from '../data/curriculum.ts'
 import type { CurriculumEntry, Topic } from '../data/curriculum.ts'
-import { getLesson } from '../data/lessons/index.ts'
+import { isWritten } from '../data/lessons/index.ts'
 import { sections } from '../lib/content.ts'
 import { blockingPrerequisites, lessonState, nextOpenLesson, topicCounts, topicProgress } from '../lib/learn.ts'
 import type { LessonState } from '../lib/learn.ts'
@@ -30,7 +30,7 @@ export function Learn() {
   const progress = useProgress()
   const lessons = progress.lessons
   const next = nextOpenLesson(lessons)
-  const written = CURRICULUM.filter((entry) => getLesson(entry.id) !== undefined).length
+  const written = CURRICULUM.filter((entry) => isWritten(entry.id)).length
   const done = CURRICULUM.filter((entry) => lessons[entry.id]?.status === 'complete').length
   const planned = CURRICULUM.filter((entry) => !entry.stretch).length
 

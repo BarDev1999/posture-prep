@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Markdown } from '../components/Markdown.tsx'
-import { getLesson } from '../data/lessons/index.ts'
+import { curriculumEntry } from '../data/curriculum.ts'
 import { sections } from '../lib/content.ts'
 import { mergeDeck } from '../lib/deck.ts'
 import { todayISO } from '../lib/date.ts'
@@ -43,7 +43,7 @@ export function Drill() {
   // A lesson handoff arrives as ?lesson=L4 and pins the drill to that lesson's
   // facts, ignoring the section and priority filters.
   const [search, setSearch] = useSearchParams()
-  const lesson = getLesson(search.get('lesson') ?? '')
+  const lesson = curriculumEntry(search.get('lesson') ?? '')
   const lessonFactIds = lesson?.practice.factIds ?? null
 
   const [queue, setQueue] = useState<string[]>([])

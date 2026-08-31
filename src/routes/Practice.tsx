@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Markdown } from '../components/Markdown.tsx'
 import { CodeDiff } from '../components/CodeDiff.tsx'
-import { getLesson } from '../data/lessons/index.ts'
+import { curriculumEntry } from '../data/curriculum.ts'
 import { articleById, questions, sections } from '../lib/content.ts'
 import { todayISO } from '../lib/date.ts'
 import { buildPracticeQueue, reduceOptions, reviewQueueSize } from '../lib/practice.ts'
@@ -37,7 +37,7 @@ export function Practice() {
   // questions. This is the blocked half of the hybrid schedule: while a topic
   // is being learned, practice on it is the same small set, repeated.
   const [search, setSearch] = useSearchParams()
-  const lesson = getLesson(search.get('lesson') ?? '')
+  const lesson = curriculumEntry(search.get('lesson') ?? '')
 
   const [filters, setFilters] = useState<PracticeFilters>({ sectionId: null, formats: null })
   const [queue, setQueue] = useState<string[]>([])

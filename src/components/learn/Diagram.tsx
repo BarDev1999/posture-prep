@@ -4,11 +4,11 @@ import type { Diagram as DiagramSpec } from '../../types/lesson.ts'
  * Lesson diagrams, drawn as inline SVG rather than shipped as images: they have
  * to follow the theme, stay sharp, and work with the network off.
  *
- * Three shapes cover the SQL block. A pipeline for a query moving stage by
- * stage with the row count shrinking, a grid for a table, and three buckets for
- * three valued logic. Each one is sized in a 340 unit viewBox, which is roughly
- * the content width of a 380px phone, so the type inside is real size there and
- * scales up rather than down.
+ * Four shapes cover the SQL block. A pipeline for a query moving stage by stage
+ * with the row count changing, a grid for a table, three buckets for three
+ * valued logic, and a pair of tables joined on a key. Each one is sized in a 340
+ * unit viewBox, which is roughly the content width of a 380px phone, so the type
+ * inside is real size there and scales up rather than down.
  */
 
 const WIDTH = 340
@@ -20,6 +20,7 @@ export function Diagram({ spec }: { spec: DiagramSpec }) {
         {spec.kind === 'pipeline' ? <Pipeline spec={spec} /> : null}
         {spec.kind === 'rows' ? <Rows spec={spec} /> : null}
         {spec.kind === 'buckets' ? <Buckets spec={spec} /> : null}
+        {spec.kind === 'link' ? <Link spec={spec} /> : null}
       </div>
       <figcaption className="mt-1.5 text-xs leading-relaxed text-muted">{spec.caption}</figcaption>
     </figure>
@@ -45,7 +46,9 @@ function Pipeline({ spec }: { spec: Extract<DiagramSpec, { kind: 'pipeline' }> }
       {spec.stages.map((stage, index) => {
         const y = index * STAGE_HEIGHT
         const previous = spec.stages[index - 1]
-        const shrank = previous !== undefined && stage.rows < previous.rows
+        // A join makes the count grow and a filter makes it fall. Both are the
+        // thing worth looking at, so the highlight follows any change.
+        const changed = previous !== undefined && stage.rows !== previous.rows
         const barWidth = Math.max(28, (WIDTH * stage.rows) / max)
         return (
           <g key={stage.label}>
@@ -55,7 +58,7 @@ function Pipeline({ spec }: { spec: Extract<DiagramSpec, { kind: 'pipeline' }> }
               y={y}
               width={barWidth}
               height={24}
-              className={shrank ? 'fill-accent-soft' : 'fill-raised'}
+              className={changed ? 'fill-accent-soft' : 'fill-raised'}
             />
             <rect x={0} y={y} width={WIDTH} height={24} className="fill-none stroke-rule" strokeWidth={1} />
             <text x={7} y={y + 16} className="fill-current font-mono text-[11px]">
@@ -223,6 +226,134 @@ function Buckets({ spec }: { spec: Extract<DiagramSpec, { kind: 'buckets' }> }) 
           </g>
         )
       })}
+    </svg>
+  )
+}
+
+// ---------------------------------------------------------------------- link
+
+const LINK_HEADER = 20
+const LINK_ROW = 19
+
+/**
+ * Two tables side by side with a line drawn from every key value on the left to
+ * the rows that carry it on the right. This is the picture of a foreign key:
+ * one row over here, many rows over there, joined by a value they share.
+ */
+function Link({ spec }: { spec: Extract<DiagramSpec, { kind: 'link' }> }) {
+  // Each column is as wide as its longest cell, and the two panels share what
+  // is left after the gap. Sizing a panel by its widest single cell instead of
+  // by the sum of its columns is what makes the columns collide.
+  const widths = (table: { columns: string[]; rows: string[][] }) =>
+    table.columns.map(
+      (column, index) => Math.max(column.length, ...table.rows.map((row) => (row[index] ?? '').length)) + 1,
+    )
+
+  const leftWidths = widths(spec.left)
+  const rightWidths = widths(spec.right)
+  const sum = (values: number[]) => values.reduce((total, value) => total + value, 0)
+  const totalChars = sum(leftWidths) + sum(rightWidths)
+
+  const gap = 30
+  const available = WIDTH - gap
+  const fontSize = Math.max(7.5, Math.min(9.5, available / (totalChars * 0.62)))
+  const unit = fontSize * 0.62
+
+  const leftWidth = sum(leftWidths) * unit
+  const rightWidth = sum(rightWidths) * unit
+  const rightX = WIDTH - rightWidth
+
+  const offsets = (columnWidths: number[], origin: number) => {
+    let cursor = origin
+    return columnWidths.map((width) => {
+      const value = cursor
+      cursor += width * unit
+      return value
+    })
+  }
+  const leftX = offsets(leftWidths, 0)
+  const rightColumnX = offsets(rightWidths, rightX)
+
+  const rows = Math.max(spec.left.rows.length, spec.right.rows.length)
+  const height = LINK_HEADER + rows * LINK_ROW + 6
+  const rowY = (index: number) => LINK_HEADER + index * LINK_ROW + 12
+
+  return (
+    <svg
+      viewBox={`0 0 ${WIDTH} ${height}`}
+      width="100%"
+      className="block h-auto w-full text-ink"
+      role="img"
+      aria-label={`${spec.left.title} on the left and ${spec.right.title} on the right, joined on ${spec.left.columns[spec.leftKey] ?? 'a key'}`}
+    >
+      <text x={0} y={8} className="fill-muted font-mono text-[8px] tracking-wider uppercase">
+        {spec.left.title}
+      </text>
+      <text x={rightX} y={8} className="fill-muted font-mono text-[8px] tracking-wider uppercase">
+        {spec.right.title}
+      </text>
+
+      {/* The links first, so the opaque row backgrounds cover their ends. */}
+      {spec.left.rows.map((leftRow, leftIndex) =>
+        spec.right.rows.map((rightRow, rightIndex) => {
+          if (leftRow[spec.leftKey] !== rightRow[spec.rightKey]) return null
+          const y1 = rowY(leftIndex) - 3
+          const y2 = rowY(rightIndex) - 3
+          const x1 = leftWidth
+          const x2 = rightX
+          const mid = (x1 + x2) / 2
+          return (
+            <path
+              key={`${leftIndex}-${rightIndex}`}
+              d={`M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2} ${y2}`}
+              className="fill-none stroke-accent"
+              strokeWidth={1}
+            />
+          )
+        }),
+      )}
+
+      {[
+        { table: spec.left, x: leftX, key: spec.leftKey, width: leftWidth, origin: 0 },
+        { table: spec.right, x: rightColumnX, key: spec.rightKey, width: rightWidth, origin: rightX },
+      ].map((panel, panelIndex) => (
+        <g key={panelIndex}>
+          {panel.table.columns.map((column, index) => (
+            <text
+              key={column}
+              x={(panel.x[index] ?? 0) + 2}
+              y={LINK_HEADER - 2}
+              className="fill-faint font-mono tracking-wide uppercase"
+              fontSize={fontSize * 0.82}
+            >
+              {column}
+            </text>
+          ))}
+          {panel.table.rows.map((row, rowIndex) => (
+            <g key={row.join('|')}>
+              <rect
+                x={panel.origin}
+                y={rowY(rowIndex) - 11}
+                width={panel.width}
+                height={LINK_ROW - 3}
+                className="fill-raised stroke-rule"
+                strokeWidth={1}
+              />
+              {row.map((cell, cellIndex) => (
+                <text
+                  key={cellIndex}
+                  x={(panel.x[cellIndex] ?? 0) + 3}
+                  y={rowY(rowIndex)}
+                  fontSize={fontSize}
+                  className={`font-mono ${cellIndex === panel.key ? 'fill-accent font-semibold' : 'fill-current'}`}
+                >
+                  {cell}
+                </text>
+              ))}
+            </g>
+          ))}
+        </g>
+      ))}
     </svg>
   )
 }

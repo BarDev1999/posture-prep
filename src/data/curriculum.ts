@@ -79,6 +79,12 @@ export type CurriculumEntry = {
   prerequisites: string[]
   /** Extra material, unlocked after its prerequisites and shown without a number. */
   stretch?: boolean
+  /**
+   * What this lesson's step 9 hands the learner into. It lives here rather than
+   * on the lesson itself because the practice and drill screens need it without
+   * pulling a whole topic's lesson content into the first chunk.
+   */
+  practice: { questionIds: string[]; factIds: string[] }
 }
 
 /** `L` plus the lesson number. Kept short because it appears in URLs. */
@@ -168,14 +174,42 @@ const ROWS: Row[] = [
   [58, 'identity', 'Golden SAML, and ITDR versus CIEM', [56]],
 ]
 
-export const CURRICULUM: CurriculumEntry[] = ROWS.map(([number, topicId, title, prerequisites, stretch]) => ({
-  id: stretch ? STRETCH_ID : id(number),
-  number,
-  topicId,
-  title,
-  prerequisites: prerequisites.map(id),
-  ...(stretch ? { stretch: true } : {}),
-}))
+/**
+ * The tagged questions and facts each written lesson hands off to. A lesson with
+ * an empty set says so on its completion screen rather than sending the learner
+ * somewhere unhelpful: the question bank does not have an item at every level.
+ */
+const PRACTICE: Record<string, { questionIds: string[]; factIds: string[] }> = {
+  L1: { questionIds: [], factIds: [] },
+  L2: { questionIds: [], factIds: [] },
+  L3: { questionIds: [], factIds: ['F3'] },
+  L4: { questionIds: ['Q1.3', 'Q1.4', 'Q1.6'], factIds: ['F3'] },
+  L5: { questionIds: ['Q1.2'], factIds: [] },
+  L6: { questionIds: ['Q1.15', 'Q1.16'], factIds: ['F1', 'F2'] },
+  L7: { questionIds: ['Q1.5'], factIds: [] },
+  L8: { questionIds: ['Q1.7'], factIds: [] },
+  L9: { questionIds: ['Q1.9', 'Q1.12'], factIds: ['F6'] },
+  L10: { questionIds: ['Q1.5', 'Q1.8'], factIds: ['F5'] },
+  L11: { questionIds: [], factIds: ['F1'] },
+  L12: { questionIds: ['Q1.13', 'Q1.18'], factIds: ['F4'] },
+  L13: { questionIds: ['Q1.16'], factIds: ['F2'] },
+  L14: { questionIds: ['Q1.10', 'Q1.11'], factIds: [] },
+}
+
+const NO_PRACTICE = { questionIds: [], factIds: [] }
+
+export const CURRICULUM: CurriculumEntry[] = ROWS.map(([number, topicId, title, prerequisites, stretch]) => {
+  const entryId = stretch ? STRETCH_ID : id(number)
+  return {
+    id: entryId,
+    number,
+    topicId,
+    title,
+    prerequisites: prerequisites.map(id),
+    practice: PRACTICE[entryId] ?? NO_PRACTICE,
+    ...(stretch ? { stretch: true } : {}),
+  }
+})
 
 const entriesById = new Map(CURRICULUM.map((entry) => [entry.id, entry]))
 const topicsById = new Map(TOPICS.map((topic) => [topic.id, topic]))

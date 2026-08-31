@@ -1,7 +1,7 @@
 import { CURRICULUM, curriculumEntry } from '../data/curriculum.ts'
 import type { CurriculumEntry } from '../data/curriculum.ts'
-import { getLesson, hasLesson } from '../data/lessons/index.ts'
-import type { FadeExercise, Lesson, ParsonsBlock, ParsonsExercise, StepKey } from '../types/lesson.ts'
+import { hasLesson } from '../data/lessons/index.ts'
+import type { FadeExercise, ParsonsBlock, ParsonsExercise, StepKey } from '../types/lesson.ts'
 import { STEP_KEYS } from '../types/lesson.ts'
 import type { GuidanceTier, Level, LessonProgress, TopicProgress } from '../types/progress.ts'
 
@@ -213,9 +213,4 @@ export function topicCounts(entries: CurriculumEntry[], lessons: Record<string, 
     if (state === 'available' || state === 'in-progress') available += 1
   }
   return { total: entries.length, written, complete, available }
-}
-
-/** The lesson record, or undefined when the lesson is not written yet. */
-export function lessonContent(lessonId: string): Lesson | undefined {
-  return getLesson(lessonId)
 }

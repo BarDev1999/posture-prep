@@ -11,7 +11,6 @@ export const lesson: Lesson = {
   minutes: 14,
   difficulty: 'easy',
   sources: ['F3', 'Q1.1', 'Q1.4', 'B#SCHEMA for the SQL questions'],
-  practice: { questionIds: [], factIds: ['F3'] },
 
   steps: {
     vocabulary: [
