@@ -1,6 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { ProgressBar } from '../components/ProgressBar.tsx'
-import { content, facts, questions, sections } from '../lib/content.ts'
+import { content, questions, sections } from '../lib/content.ts'
+import { mergeDeck } from '../lib/deck.ts'
 import { todayISO } from '../lib/date.ts'
 import {
   buildDrillQueue,
@@ -21,6 +22,7 @@ export function Home() {
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
   const today = todayISO()
+  const facts = mergeDeck(progress.extraFacts)
 
   const stats = sectionStats(sections, facts, questions, progress.facts, progress.questions, today)
   const ranked = rankByNeed(stats)
@@ -119,8 +121,12 @@ export function Home() {
 
       <p className="mt-6 text-xs leading-relaxed text-faint">
         {content.counts.facts} facts and {content.counts.questions} questions parsed from the source
-        files. Question practice, the query sandbox and the reference library arrive in the next
-        stage. <Link to="/settings" className="underline">Settings</Link> holds the exam date.
+        files
+        {progress.extraFacts.length > 0 ? `, plus ${progress.extraFacts.length} imported` : ''}.{' '}
+        <Link to="/settings" className="underline">
+          Settings
+        </Link>{' '}
+        holds the exam date and your data.
       </p>
     </div>
   )

@@ -56,6 +56,9 @@ The parser fails the build loudly, with a non zero exit code, when:
 
 To parse a different directory, set `CONTENT_SOURCE_DIR` and `CONTENT_OUT_FILE`.
 
+Extra facts can also be added after the build, without one: Settings takes a markdown
+file in the same shape as file D, parses it in the browser, and merges it into the drill.
+
 ## Deployment
 
 Static build, deployed to GitHub Pages by `.github/workflows/deploy.yml` on every push
@@ -78,7 +81,7 @@ scripts/           build-content.ts (parser), verify-core.ts, verify-sandbox.ts,
 src/lib/           storage, Leitner scheduling, session and practice queues, search
 src/lib/sql/       schema conversion, seed data, sql.js wrapper, result set grading
 src/state/         React context plus a reducer, the whole app state
-src/routes/        Home, Drill, Practice, Sandbox, Library, Settings
+src/routes/        Home, Drill, Practice, Sandbox, Library, Mock, Explain, Settings
 src/components/    shell, markdown renderer, code diff, result table, more sheet
 src/data/          content.json, generated, not committed
 ```
@@ -92,5 +95,6 @@ Built in the order set by the spec, one commit per stage.
 2. **Stage 2, done.** Query sandbox on sql.js with a seeded database and grading by
    result set, question practice for every format, reference library with search, and
    the difficulty level system.
-3. **Stage 3.** Mock exam, explain it back, export and import, extra content import.
+3. **Stage 3, done.** Mock exam with a countdown and saved attempts, explain it back,
+   progress export and import, extra fact deck import, reset behind a typed confirmation.
 4. **Stage 4.** Styling pass against real content.

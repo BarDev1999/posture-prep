@@ -1,8 +1,12 @@
 import type {
+  ExtraFact,
   FactProgress,
   Level,
+  MockAttempt,
+  MockVariant,
   ProgressState,
   QuestionProgress,
+  QuestionResult,
   Rating,
   SessionRecord,
   Settings,
@@ -19,8 +23,13 @@ import { isValidISODate } from './date.ts'
  * phone holding last week's shape still opens.
  */
 
+/**
+ * The key stays put across versions. Migration is driven by the schemaVersion
+ * inside the stored object, so a phone holding an older shape is upgraded
+ * rather than orphaned under a key nothing reads any more.
+ */
 export const STORAGE_KEY = 'posture-prep.v1'
-export const SCHEMA_VERSION = 1
+export const SCHEMA_VERSION = 2
 export const DEFAULT_EXAM_DATE = '2026-09-03'
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -38,6 +47,8 @@ export function defaultState(): ProgressState {
     facts: {},
     questions: {},
     sessions: [],
+    mockAttempts: [],
+    extraFacts: [],
   }
 }
 
@@ -75,7 +86,15 @@ export function isPersistent(): boolean {
  * One entry per version step: `migrations[n]` upgrades a state written at
  * version n to version n + 1. Add a step here whenever the shape changes.
  */
-const migrations: Record<number, (state: Record<string, unknown>) => Record<string, unknown>> = {}
+const migrations: Record<number, (state: Record<string, unknown>) => Record<string, unknown>> = {
+  // 1 to 2: mock exam attempts and runtime imported facts. Nothing existing
+  // changes shape, the two collections simply start empty.
+  1: (state) => ({
+    ...state,
+    mockAttempts: Array.isArray(state.mockAttempts) ? state.mockAttempts : [],
+    extraFacts: Array.isArray(state.extraFacts) ? state.extraFacts : [],
+  }),
+}
 
 function migrate(input: Record<string, unknown>): Record<string, unknown> {
   let state = input
@@ -153,6 +172,62 @@ function coerceSettings(value: unknown): Settings {
   return { level, examDate, theme, priorityOnly: raw.priorityOnly === true, sectionFilter }
 }
 
+const RESULTS: QuestionResult[] = ['correct', 'partial', 'wrong']
+
+function coerceMockAttempt(value: unknown): MockAttempt | null {
+  const raw = asRecord(value)
+  if (typeof raw.id !== 'string' || typeof raw.date !== 'string' || !isValidISODate(raw.date)) return null
+
+  const questionIds = Array.isArray(raw.questionIds) ? raw.questionIds.filter((id) => typeof id === 'string') : []
+  if (questionIds.length === 0) return null
+
+  const results: Record<string, QuestionResult> = {}
+  for (const [id, result] of Object.entries(asRecord(raw.results))) {
+    const match = RESULTS.find((option) => option === result)
+    if (match) results[id] = match
+  }
+
+  const perSection: Record<string, { correct: number; total: number }> = {}
+  for (const [id, counts] of Object.entries(asRecord(raw.perSection))) {
+    const entry = asRecord(counts)
+    perSection[id] = {
+      correct: typeof entry.correct === 'number' ? Math.max(0, entry.correct) : 0,
+      total: typeof entry.total === 'number' ? Math.max(0, entry.total) : 0,
+    }
+  }
+
+  const variant: MockVariant = raw.variant === 'short' ? 'short' : 'full'
+  return {
+    id: raw.id,
+    date: raw.date,
+    variant,
+    durationMs: typeof raw.durationMs === 'number' && raw.durationMs >= 0 ? Math.floor(raw.durationMs) : 0,
+    timedOut: raw.timedOut === true,
+    questionIds,
+    results,
+    perSection,
+    weightedScore: typeof raw.weightedScore === 'number' ? Math.max(0, Math.min(100, raw.weightedScore)) : 0,
+    rawCorrect: typeof raw.rawCorrect === 'number' ? Math.max(0, Math.floor(raw.rawCorrect)) : 0,
+    rawTotal: typeof raw.rawTotal === 'number' ? Math.max(0, Math.floor(raw.rawTotal)) : questionIds.length,
+  }
+}
+
+function coerceExtraFact(value: unknown): ExtraFact | null {
+  const raw = asRecord(value)
+  if (typeof raw.id !== 'string' || typeof raw.front !== 'string' || typeof raw.back !== 'string') return null
+  if (raw.front.trim().length === 0 || raw.back.trim().length === 0) return null
+  const section = typeof raw.section === 'number' && raw.section >= 1 && raw.section <= 5 ? Math.floor(raw.section) : 1
+  return {
+    id: raw.id,
+    number: typeof raw.number === 'number' ? Math.floor(raw.number) : 0,
+    section,
+    front: raw.front,
+    back: raw.back,
+    isPriority: raw.isPriority === true,
+    sourceName: typeof raw.sourceName === 'string' ? raw.sourceName : 'imported',
+  }
+}
+
 /** Turns anything at all into a valid state. Unknown fields are dropped. */
 export function coerceState(value: unknown): ProgressState {
   const raw = migrate(asRecord(value))
@@ -168,13 +243,82 @@ export function coerceState(value: unknown): ProgressState {
     .filter((session): session is SessionRecord => session !== null)
     .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
 
+  const mockAttempts = (Array.isArray(raw.mockAttempts) ? raw.mockAttempts : [])
+    .map(coerceMockAttempt)
+    .filter((attempt): attempt is MockAttempt => attempt !== null)
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+
+  const extraFacts = (Array.isArray(raw.extraFacts) ? raw.extraFacts : [])
+    .map(coerceExtraFact)
+    .filter((fact): fact is ExtraFact => fact !== null)
+
   return {
     schemaVersion: SCHEMA_VERSION,
     settings: coerceSettings(raw.settings),
     facts,
     questions,
     sessions,
+    mockAttempts,
+    extraFacts,
   }
+}
+
+// ---------------------------------------------------------- export, import
+
+export type ImportSummary = {
+  facts: number
+  questions: number
+  sessions: number
+  mockAttempts: number
+  extraFacts: number
+  schemaVersion: number
+}
+
+export function summarise(state: ProgressState): ImportSummary {
+  return {
+    facts: Object.keys(state.facts).length,
+    questions: Object.keys(state.questions).length,
+    sessions: state.sessions.length,
+    mockAttempts: state.mockAttempts.length,
+    extraFacts: state.extraFacts.length,
+    schemaVersion: state.schemaVersion,
+  }
+}
+
+export type ExportEnvelope = {
+  app: 'posture-prep'
+  exportedAt: string
+  state: ProgressState
+}
+
+export function exportPayload(state: ProgressState, now: Date = new Date()): string {
+  const envelope: ExportEnvelope = { app: 'posture-prep', exportedAt: now.toISOString(), state }
+  return JSON.stringify(envelope, null, 2)
+}
+
+export function exportFilename(now: Date = new Date()): string {
+  const stamp = now.toISOString().slice(0, 10)
+  return `posture-prep-progress-${stamp}.json`
+}
+
+/**
+ * Accepts either the exported envelope or a bare state object, so a file
+ * hand edited down to its state still restores.
+ */
+export function parseImport(text: string): { ok: true; state: ProgressState } | { ok: false; error: string } {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(text)
+  } catch {
+    return { ok: false, error: 'That file is not valid JSON.' }
+  }
+  const record = asRecord(parsed)
+  const candidate = 'state' in record ? record.state : record
+  const inner = asRecord(candidate)
+  if (!('facts' in inner) && !('settings' in inner) && !('sessions' in inner)) {
+    return { ok: false, error: 'That file does not look like a Posture Prep export.' }
+  }
+  return { ok: true, state: coerceState(candidate) }
 }
 
 // ------------------------------------------------------------------- api

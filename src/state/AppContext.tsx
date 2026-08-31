@@ -1,7 +1,9 @@
 import { createContext, useContext, useEffect, useReducer } from 'react'
 import type { Dispatch, ReactNode } from 'react'
 import type {
+  ExtraFact,
   Level,
+  MockAttempt,
   ProgressState,
   QuestionResult,
   Rating,
@@ -36,6 +38,9 @@ export type Action =
       elapsedMs: number
     }
   | { type: 'clear-review'; questionId: string }
+  | { type: 'save-mock'; attempt: MockAttempt }
+  | { type: 'import-facts'; facts: ExtraFact[] }
+  | { type: 'remove-imported'; sourceName: string }
   | { type: 'set-theme'; theme: ThemeSetting }
   | { type: 'set-level'; level: Level }
   | { type: 'set-exam-date'; examDate: string }
@@ -98,6 +103,23 @@ export function reducer(state: ProgressState, action: Action): ProgressState {
         questions: { ...state.questions, [action.questionId]: { ...previous, inReviewQueue: false } },
       }
     }
+    case 'save-mock':
+      return { ...state, mockAttempts: [...state.mockAttempts, action.attempt] }
+    case 'import-facts':
+      return { ...state, extraFacts: [...state.extraFacts, ...action.facts] }
+    case 'remove-imported': {
+      const removed = new Set(
+        state.extraFacts.filter((fact) => fact.sourceName === action.sourceName).map((fact) => fact.id),
+      )
+      if (removed.size === 0) return state
+      const facts = { ...state.facts }
+      for (const id of removed) delete facts[id]
+      return {
+        ...state,
+        facts,
+        extraFacts: state.extraFacts.filter((fact) => fact.sourceName !== action.sourceName),
+      }
+    }
     case 'set-theme':
       return { ...state, settings: { ...state.settings, theme: action.theme } }
     case 'set-level':
@@ -111,8 +133,9 @@ export function reducer(state: ProgressState, action: Action): ProgressState {
     case 'replace':
       return action.state
     case 'reset':
-      // Settings are preferences, not progress, so they survive a reset.
-      return { ...defaultState(), settings: state.settings }
+      // Settings are preferences and imported facts are content. Neither is
+      // progress, so both survive a reset.
+      return { ...defaultState(), settings: state.settings, extraFacts: state.extraFacts }
   }
 }
 

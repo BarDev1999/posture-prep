@@ -2,11 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Markdown } from '../components/Markdown.tsx'
-import { facts, getFact, sections } from '../lib/content.ts'
+import { sections } from '../lib/content.ts'
+import { mergeDeck } from '../lib/deck.ts'
 import { todayISO } from '../lib/date.ts'
 import { boxInterval, dueDate } from '../lib/leitner.ts'
 import { buildDrillQueue, requeueMissed } from '../lib/session.ts'
 import { useAppDispatch, useProgress } from '../state/AppContext.tsx'
+import type { Fact } from '../types/content.ts'
 import type { FactProgress, Rating } from '../types/progress.ts'
 
 /**
@@ -31,6 +33,8 @@ export function Drill() {
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
   const today = todayISO()
+  const facts = mergeDeck(progress.extraFacts)
+  const factsById = useMemo(() => new Map(facts.map((fact) => [fact.id, fact])), [facts])
 
   const { sectionFilter, priorityOnly } = progress.settings
 
@@ -60,7 +64,9 @@ export function Drill() {
     setIndex(0)
     setRevealed(false)
     setDragX(0)
-  }, [sectionFilter, priorityOnly, today, drillAhead])
+    // mergeDeck returns a stable reference, so listing the deck here rebuilds
+    // the queue when facts are imported without looping on every render.
+  }, [facts, sectionFilter, priorityOnly, today, drillAhead])
 
   // Live counters read current progress, so "due today" falls as cards are rated.
   const live = useMemo(
@@ -74,7 +80,7 @@ export function Drill() {
   }, [index])
 
   const currentId = queue[index]
-  const fact = currentId ? getFact(currentId) : undefined
+  const fact = currentId ? factsById.get(currentId) : undefined
 
   const rate = useCallback(
     (rating: Rating) => {
@@ -294,7 +300,7 @@ export function Drill() {
           priorityOnly={priorityOnly}
           sectionFilter={sectionFilter}
           startedWith={queue.length}
-          nextDue={nextDueLabel(progress.facts, sectionFilter, priorityOnly)}
+          nextDue={nextDueLabel(facts, progress.facts, sectionFilter, priorityOnly)}
           onDrillPriority={() => {
             dispatch({ type: 'set-priority-only', value: true })
             setDrillAhead(true)
@@ -313,11 +319,12 @@ export function Drill() {
 }
 
 function nextDueLabel(
+  deck: Fact[],
   factProgress: Record<string, FactProgress>,
   sectionFilter: number | null,
   priorityOnly: boolean,
 ): string | null {
-  const pool = facts.filter((fact) => {
+  const pool = deck.filter((fact) => {
     if (sectionFilter !== null && fact.section !== sectionFilter) return false
     if (priorityOnly && !fact.isPriority) return false
     return true

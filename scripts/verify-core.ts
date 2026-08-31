@@ -15,7 +15,26 @@ import { fileURLToPath } from 'node:url'
 import { applyRating, boxInterval, dueDate, isDue, newFactProgress } from '../src/lib/leitner.ts'
 import { addDays } from '../src/lib/date.ts'
 import { buildDrillQueue, currentStreak, rankByNeed, requeueMissed, sectionStats } from '../src/lib/session.ts'
-import { coerceState, defaultState } from '../src/lib/storage.ts'
+import {
+  SCHEMA_VERSION,
+  coerceState,
+  defaultState,
+  exportFilename,
+  exportPayload,
+  parseImport,
+  summarise,
+} from '../src/lib/storage.ts'
+import {
+  FULL_BLUEPRINT,
+  blueprintFor,
+  buildMockPaper,
+  formatClock,
+  paperSize,
+  scorePaper,
+} from '../src/lib/mock.ts'
+import { keyPoints } from '../src/lib/keypoints.ts'
+import { parseFactMarkdown } from '../src/lib/importFacts.ts'
+import { mergeDeck } from '../src/lib/deck.ts'
 import {
   allowsQuestion,
   buildPracticeQueue,
@@ -26,7 +45,7 @@ import {
 import { search } from '../src/lib/search.ts'
 import { changedLineCount, diffLines } from '../src/lib/diff.ts'
 import type { ContentBundle, Fact } from '../src/types/content.ts'
-import type { FactProgress, QuestionProgress } from '../src/types/progress.ts'
+import type { FactProgress, ProgressState, QuestionProgress, QuestionResult } from '../src/types/progress.ts'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const SOURCE_DIR = resolve(ROOT, 'content', 'source')
@@ -280,7 +299,10 @@ check(
 section('Storage')
 
 const restored = coerceState(JSON.parse(JSON.stringify(defaultState())))
-check('a default state round trips', restored.schemaVersion === 1 && restored.settings.examDate === '2026-09-03')
+check(
+  'a default state round trips',
+  restored.schemaVersion === SCHEMA_VERSION && restored.settings.examDate === '2026-09-03',
+)
 check('rubbish input still yields a usable state', coerceState('not a state').facts !== undefined)
 check('an out of range box is clamped', coerceState({ facts: { F1: { box: 99 } } }).facts.F1?.box === 5)
 check('an invalid date is dropped', coerceState({ facts: { F1: { lastReviewed: 'yesterday' } } }).facts.F1?.lastReviewed === null)
@@ -427,6 +449,210 @@ for (const question of bugHunt) {
     `${changed} changed of ${lines.length} lines`,
   )
 }
+
+// ---------------------------------------------------------------- migration
+
+section('Schema migration')
+
+// A state written before mock attempts and imported facts existed.
+const legacy = {
+  schemaVersion: 1,
+  settings: { level: 3, examDate: '2026-09-03', theme: 'dark', priorityOnly: true, sectionFilter: 2 },
+  facts: { F1: { box: 3, lastReviewed: today, reviewCount: 4, lastRating: 'got' } },
+  questions: { 'Q1.4': { attempts: 2, lastResult: 'wrong', inReviewQueue: true, lastAttemptedAt: today } },
+  sessions: [{ date: today, durationMs: 1000, itemsCompleted: 5, perSection: { '1': 5 } }],
+}
+const migrated = coerceState(legacy)
+check('an older state is migrated forward', migrated.schemaVersion === SCHEMA_VERSION)
+check('the new collections start empty', migrated.mockAttempts.length === 0 && migrated.extraFacts.length === 0)
+check(
+  'nothing that was already there is lost',
+  migrated.facts.F1?.box === 3 &&
+    migrated.questions['Q1.4']?.attempts === 2 &&
+    migrated.sessions.length === 1 &&
+    migrated.settings.level === 3 &&
+    migrated.settings.sectionFilter === 2,
+)
+
+section('Export and import')
+
+const populated: ProgressState = {
+  ...defaultState(),
+  facts: { F1: { box: 2, lastReviewed: today, reviewCount: 1, lastRating: 'got' } },
+  questions: { 'Q2.1': { attempts: 1, lastResult: 'correct', inReviewQueue: false, lastAttemptedAt: today } },
+  sessions: [{ date: today, durationMs: 5000, itemsCompleted: 3, perSection: { '2': 3 } }],
+  mockAttempts: [
+    {
+      id: '2026-08-31T10:00:00.000Z',
+      date: today,
+      variant: 'full',
+      durationMs: 60_000,
+      timedOut: false,
+      questionIds: ['Q2.1'],
+      results: { 'Q2.1': 'correct' },
+      perSection: { '2': { correct: 1, total: 1 } },
+      weightedScore: 100,
+      rawCorrect: 1,
+      rawTotal: 1,
+    },
+  ],
+  extraFacts: [
+    { id: 'X1', number: 1, section: 3, front: 'front', back: 'back', isPriority: true, sourceName: 'extra.md' },
+  ],
+}
+
+const payload = exportPayload(populated, new Date('2026-08-31T12:00:00Z'))
+check('the export is valid JSON', (() => {
+  try {
+    JSON.parse(payload)
+    return true
+  } catch {
+    return false
+  }
+})())
+check('the filename is dated', exportFilename(new Date('2026-08-31T12:00:00Z')) === 'posture-prep-progress-2026-08-31.json')
+
+const reimported = parseImport(payload)
+check('the export imports back', reimported.ok)
+if (reimported.ok) {
+  check(
+    'every record survives the round trip',
+    reimported.state.facts.F1?.box === 2 &&
+      reimported.state.questions['Q2.1']?.lastResult === 'correct' &&
+      reimported.state.sessions.length === 1 &&
+      reimported.state.mockAttempts.length === 1 &&
+      reimported.state.extraFacts.length === 1,
+  )
+  check(
+    'the import summary counts what will be replaced',
+    JSON.stringify(summarise(reimported.state)) === JSON.stringify(summarise(populated)),
+  )
+}
+check('a bare state object imports too', parseImport(JSON.stringify(populated)).ok)
+check('rubbish is rejected with a reason', !parseImport('not json').ok)
+check('an unrelated JSON file is rejected', !parseImport('{"hello":"world"}').ok)
+
+section('Mock exam')
+
+check('the full paper is 25 questions', paperSize('full') === 25)
+check('the short paper is 17 questions', paperSize('short') === 17)
+check(
+  'the full blueprint is 6, 6, 5, 5, 3',
+  JSON.stringify(blueprintFor('full')) === JSON.stringify({ 1: 6, 2: 6, 3: 5, 4: 5, 5: 3 }),
+)
+check(
+  'the short paper covers sections 1, 2 and 4 only',
+  Object.keys(blueprintFor('short')).join(',') === '1,2,4',
+)
+
+const paper = buildMockPaper(allQuestions, 'full', 1234)
+check('a full paper draws 25 questions', paper.length === 25)
+check('with no repeats', new Set(paper).size === 25)
+const paperSections = paper.map((id) => allQuestions.find((q) => q.id === id)?.section)
+check(
+  'and matches the blueprint section by section',
+  [1, 2, 3, 4, 5].every(
+    (sectionId) => paperSections.filter((value) => value === sectionId).length === FULL_BLUEPRINT[sectionId],
+  ),
+  paperSections.join(','),
+)
+
+const shortPaper = buildMockPaper(allQuestions, 'short', 1234)
+check('a short paper is 17 questions from three sections', shortPaper.length === 17)
+check(
+  'and never draws from sections 3 or 5',
+  shortPaper.every((id) => {
+    const found = allQuestions.find((q) => q.id === id)?.section
+    return found === 1 || found === 2 || found === 4
+  }),
+)
+
+const secondPaper = buildMockPaper(allQuestions, 'full', 5678, paper)
+const overlap = secondPaper.filter((id) => paper.includes(id)).length
+check('a second attempt avoids the previous paper where it can', overlap < 8, `${overlap} of 25 repeated`)
+
+const perfect: Record<string, QuestionResult> = {}
+for (const id of paper) perfect[id] = 'correct'
+const fullMarks = scorePaper(paper, allQuestions, perfect, content.sections)
+check('a perfect paper scores 100', Math.round(fullMarks.weightedScore) === 100)
+check('and counts every mark', fullMarks.rawCorrect === 25 && fullMarks.rawTotal === 25)
+
+const halfMarks: Record<string, QuestionResult> = {}
+for (const id of paper) halfMarks[id] = 'partial'
+check('partial answers are worth half a mark', scorePaper(paper, allQuestions, halfMarks, content.sections).rawCorrect === 12.5)
+
+const sectionOneOnly: Record<string, QuestionResult> = {}
+for (const id of paper) {
+  const found = allQuestions.find((q) => q.id === id)
+  if (found?.section === 1) sectionOneOnly[id] = 'correct'
+}
+const skewed = scorePaper(paper, allQuestions, sectionOneOnly, content.sections)
+check(
+  'the score is weighted by section, not by question count',
+  Math.round(skewed.weightedScore) === 25,
+  `got ${skewed.weightedScore.toFixed(1)} for section 1 alone, which is 25 percent of the exam`,
+)
+check('unmarked answers are reported', scorePaper(paper, allQuestions, {}, content.sections).ungraded === 25)
+check('the clock formats as minutes and seconds', formatClock(90 * 60 * 1000) === '90:00' && formatClock(-5) === '00:00')
+
+section('Explain it back')
+
+const sampleAnswer = content.questions.find((q) => q.id === 'Q5.6')?.answer ?? ''
+const points = keyPoints(sampleAnswer)
+check('a model answer splits into checklist points', points.length >= 3, `${points.length} points`)
+check('no point is a fragment', points.every((point) => point.length >= 18))
+check('the checklist is capped', keyPoints(content.questions.map((q) => q.answer).join('\n')).length <= 8)
+check(
+  'code blocks are left out of the checklist',
+  keyPoints('Do this.\n```sql\nSELECT 1;\n```\nAnd then do that properly.').every(
+    (point) => !point.includes('SELECT'),
+  ),
+)
+
+section('Importing extra facts')
+
+const goodDeck = [
+  '# Section 3: Cloud Security',
+  '',
+  '**1. What makes a subnet public?**',
+  'A route to an internet gateway in its route table.',
+  '',
+  '**2. What is a NAT gateway for?**',
+  'Outbound connections from a private subnet, which is why it does not stop C2 traffic.',
+  '',
+  '## Priority if you run out of time',
+  'Learn these first: facts 2',
+].join('\n')
+
+const imported = parseFactMarkdown(goodDeck, 'extra.md', 0)
+check('a well formed deck imports', imported.ok)
+if (imported.ok) {
+  check('both facts are found', imported.facts.length === 2)
+  check('the section comes from the heading', imported.facts.every((fact) => fact.section === 3))
+  check('the priority list is honoured', imported.facts.filter((fact) => fact.isPriority).length === 1)
+  check('ids do not collide with the built in deck', imported.facts.every((fact) => fact.id.startsWith('X')))
+  const merged = mergeDeck(imported.facts)
+  check('the imported facts merge into the deck', merged.length === content.facts.length + 2)
+  check(
+    'and the drill will serve them',
+    buildDrillQueue(merged, {}, { sectionId: 3, priorityOnly: false }, today).order.some((id) =>
+      id.startsWith('X'),
+    ),
+  )
+}
+
+const noSection = parseFactMarkdown('**1. A question?**\nAn answer.', 'bad.md', 0)
+check('a file with no section heading is rejected', !noSection.ok)
+check('and the message says what was expected', !noSection.ok && noSection.hint.includes('# Section'))
+check('an empty file is rejected', !parseFactMarkdown('', 'empty.md', 0).ok)
+
+const partialDeck = parseFactMarkdown(
+  ['# Section 1: Code and SQL', '', '**1. A question with no answer?**', '', '**2. A real one?**', 'Yes.'].join('\n'),
+  'partial.md',
+  0,
+)
+check('a fact with no answer is skipped, not fatal', partialDeck.ok && partialDeck.facts.length === 1)
+check('and the skip is reported', partialDeck.ok && partialDeck.warnings.some((w) => w.includes('no answer')))
 
 // --------------------------------------------------------------------- done
 

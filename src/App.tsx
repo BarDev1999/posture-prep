@@ -5,6 +5,8 @@ import { Home } from './routes/Home.tsx'
 import { Drill } from './routes/Drill.tsx'
 import { Practice } from './routes/Practice.tsx'
 import { Article, Library } from './routes/Library.tsx'
+import { Mock } from './routes/Mock.tsx'
+import { Explain } from './routes/Explain.tsx'
 import { Settings } from './routes/Settings.tsx'
 import { AppProvider } from './state/AppContext.tsx'
 
@@ -37,6 +39,8 @@ export function App() {
             />
             <Route path="/library" element={<Library />} />
             <Route path="/library/:slug" element={<Article />} />
+            <Route path="/mock" element={<Mock />} />
+            <Route path="/explain" element={<Explain />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
