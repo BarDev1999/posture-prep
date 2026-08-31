@@ -14,12 +14,12 @@ import { fileURLToPath } from 'node:url'
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const PUBLIC_DIR = resolve(ROOT, 'public')
 
-const GROUND = [0x0b, 0x0f, 0x14]
+const GROUND = [0x0a, 0x0d, 0x12]
 const BARS = [
-  { color: [0x2f, 0xb4, 0x91], width: 1.0 },
+  { color: [0x35, 0xc2, 0x94], width: 1.0 },
   { color: [0x6b, 0xa5, 0xef], width: 0.78 },
-  { color: [0xe0, 0x91, 0x3f], width: 0.56 },
-  { color: [0xe0, 0x61, 0x6c], width: 0.34 },
+  { color: [0xe0, 0x8a, 0x3a], width: 0.56 },
+  { color: [0xe3, 0x5d, 0x68], width: 0.34 },
 ]
 
 // ------------------------------------------------------------ PNG encoding
@@ -116,11 +116,11 @@ function drawIcon(size, inset) {
 }
 
 const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" fill="#0b0f14"/>
-  <rect x="96" y="140" width="320" height="54" fill="#2fb491"/>
+  <rect width="512" height="512" fill="#0a0d12"/>
+  <rect x="96" y="140" width="320" height="54" fill="#35c294"/>
   <rect x="96" y="223" width="250" height="54" fill="#6ba5ef"/>
-  <rect x="96" y="306" width="179" height="54" fill="#e0913f"/>
-  <rect x="96" y="389" width="109" height="54" fill="#e0616c"/>
+  <rect x="96" y="306" width="179" height="54" fill="#e08a3a"/>
+  <rect x="96" y="389" width="109" height="54" fill="#e35d68"/>
 </svg>
 `
 

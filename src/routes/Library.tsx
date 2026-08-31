@@ -16,7 +16,7 @@ export function Library() {
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-4">
-      <h1 className="font-mono text-xs tracking-[0.14em] text-muted uppercase">Reference</h1>
+      <h1 className="eyebrow">Reference</h1>
 
       <label className="mt-2 block">
         <span className="sr-only">Search articles, questions and facts</span>
@@ -27,7 +27,7 @@ export function Library() {
           placeholder="Search articles, questions and facts"
           autoCapitalize="off"
           autoCorrect="off"
-          className="min-h-12 w-full rounded border border-line bg-surface2 px-3 text-base"
+          className="min-h-12 w-full rounded-sm border border-rule bg-raised px-3 text-base"
         />
       </label>
 
@@ -39,7 +39,7 @@ export function Library() {
             <li key={article.id}>
               <Link
                 to={`/library/${article.slug}`}
-                className="block border border-line bg-surface p-3 hover:border-line-strong"
+                className="block sheet p-3 hover:border-rule-strong"
               >
                 <span className="text-sm font-semibold">{article.title}</span>
                 {article.headings.length > 0 ? (
@@ -49,7 +49,7 @@ export function Library() {
                   </span>
                 ) : null}
                 {article.hasTable ? (
-                  <span className="mt-1 block font-mono text-[11px] text-faint">contains tables</span>
+                  <span className="mt-1 block data">contains tables</span>
                 ) : null}
               </Link>
             </li>
@@ -75,7 +75,7 @@ function SearchResults({ hits, query }: { hits: SearchHit[]; query: string }) {
 
   return (
     <>
-      <p className="mt-3 font-mono text-[11px] text-faint">
+      <p className="mt-3 data">
         {hits.length} {hits.length === 1 ? 'result' : 'results'}
       </p>
       <ul className="mt-2 space-y-2">
@@ -97,9 +97,9 @@ function HitCard({ hit }: { hit: SearchHit }) {
     return (
       <Link
         to={article ? `/library/${article.slug}` : '/library'}
-        className="block border border-line bg-surface p-3 hover:border-line-strong"
+        className="block sheet p-3 hover:border-rule-strong"
       >
-        <span className="font-mono text-[11px] text-faint">{meta}</span>
+        <span className="data">{meta}</span>
         <span className="mt-1 block text-sm font-semibold">{hit.title}</span>
         <span className="mt-1 block text-xs leading-relaxed text-muted">{hit.snippet}</span>
       </Link>
@@ -110,17 +110,17 @@ function HitCard({ hit }: { hit: SearchHit }) {
   const fact = hit.kind === 'fact' ? facts.find((entry) => entry.id === hit.id) : undefined
 
   return (
-    <details className="border border-line bg-surface">
+    <details className="sheet">
       <summary className="cursor-pointer px-3 py-3">
-        <span className="font-mono text-[11px] text-faint">{meta}</span>
+        <span className="data">{meta}</span>
         <span className="mt-1 block text-sm font-semibold">{hit.title}</span>
         <span className="mt-1 block text-xs leading-relaxed text-muted">{hit.snippet}</span>
       </summary>
-      <div className="border-t border-line px-3 pb-3">
+      <div className="border-t border-rule px-3 pb-3">
         {question ? (
           <>
             <Markdown className="mt-2">{question.prompt}</Markdown>
-            <p className="mt-3 font-mono text-xs tracking-wide text-muted uppercase">Answer</p>
+            <p className="mt-3 eyebrow">Answer</p>
             <Markdown className="mt-1">{question.answer}</Markdown>
           </>
         ) : null}

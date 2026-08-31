@@ -7,73 +7,78 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
- * Stage 1 token set. The full design pass is stage 4; this is a working
- * foundation, deliberately not a generic study app look.
+ * Tokens. The plan and the critique behind these live in DESIGN.md.
  *
- * The reference is a posture ledger: a near black rule sheet, hairline borders
- * instead of soft drop shadows, monospaced identifiers and counts, and a
- * severity ramp that is reserved for real severity rather than decoration.
+ * The reference is a posture ledger: a ruled sheet, a left gutter carrying
+ * identifiers, monospace for data and proportional type for prose, square
+ * corners, and no shadows anywhere. One accent, meaning cleared. A separate
+ * severity ramp, used only for genuine severity and never on its own.
  */
 :root {
-  --ground: #f4f6f8;
-  --surface: #ffffff;
-  --surface-2: #e9edf2;
-  --line: #d5dce4;
-  --line-strong: #b3bfcd;
-  --ink: #0f1720;
-  --ink-muted: #4a5867;
-  --ink-faint: #6d7d8e;
+  /* Paper ledger. Cool, not cream. */
+  --ground: #eef1f5;
+  --sheet: #ffffff;
+  --sheet-raised: #f2f5f9;
+  --rule: #d7dee7;
+  --rule-strong: #aebccb;
+  --ink: #0c1219;
+  --ink-muted: #48586a;
+  --ink-faint: #6d7f93;
 
-  --accent: #0f7f66;
+  --accent: #0d7a5f;
   --accent-ink: #ffffff;
-  --accent-soft: #d8efe8;
+  --accent-soft: #d9efe8;
 
-  --sev-critical: #b3232f;
-  --sev-high: #a75212;
-  --sev-medium: #8a6a10;
-  --sev-low: #245f9e;
+  --sev-critical: #b02430;
+  --sev-high: #9a5210;
+  --sev-medium: #7c6410;
+  --sev-low: #1f5f9e;
 
-  --rate-missed: #b3232f;
-  --rate-hard: #a75212;
-  --rate-got: #245f9e;
-  --rate-easy: #196b4b;
+  --rate-missed: var(--sev-critical);
+  --rate-hard: var(--sev-high);
+  --rate-got: var(--sev-low);
+  --rate-easy: #146b4f;
 
-  --focus: #0f7f66;
+  --focus: #0d7a5f;
+
+  --radius: 2px;
+  --gutter: 2.75rem;
 }
 
 .dark {
-  --ground: #0b0f14;
-  --surface: #111820;
-  --surface-2: #172029;
-  --line: #223040;
-  --line-strong: #33465c;
-  --ink: #e3ebf2;
-  --ink-muted: #97a8b9;
-  --ink-faint: #6c7d8f;
+  /* Night ledger. */
+  --ground: #0a0d12;
+  --sheet: #10151c;
+  --sheet-raised: #171e27;
+  --rule: #1e2733;
+  --rule-strong: #33445a;
+  --ink: #e6edf5;
+  --ink-muted: #93a3b5;
+  --ink-faint: #64758a;
 
-  --accent: #2fb491;
-  --accent-ink: #04140f;
-  --accent-soft: #10312a;
+  --accent: #35c294;
+  --accent-ink: #04140e;
+  --accent-soft: #0d2b23;
 
-  --sev-critical: #e0616c;
-  --sev-high: #e0913f;
-  --sev-medium: #d3b04a;
+  --sev-critical: #e35d68;
+  --sev-high: #e08a3a;
+  --sev-medium: #cfae45;
   --sev-low: #6ba5ef;
 
-  --rate-missed: #e0616c;
-  --rate-hard: #e0913f;
-  --rate-got: #6ba5ef;
-  --rate-easy: #4cbd8c;
+  --rate-missed: var(--sev-critical);
+  --rate-hard: var(--sev-high);
+  --rate-got: var(--sev-low);
+  --rate-easy: #47c095;
 
-  --focus: #4cbd8c;
+  --focus: #47c095;
 }
 
 @theme inline {
   --color-ground: var(--ground);
-  --color-surface: var(--surface);
-  --color-surface2: var(--surface-2);
-  --color-line: var(--line);
-  --color-line-strong: var(--line-strong);
+  --color-sheet: var(--sheet);
+  --color-raised: var(--sheet-raised);
+  --color-rule: var(--rule);
+  --color-rule-strong: var(--rule-strong);
   --color-ink: var(--ink);
   --color-muted: var(--ink-muted);
   --color-faint: var(--ink-faint);
@@ -91,11 +96,30 @@
   --color-got: var(--rate-got);
   --color-easy: var(--rate-easy);
 
+  --radius-sm: var(--radius);
+  --radius-md: var(--radius);
+  --radius-lg: var(--radius);
+  --radius-xl: 3px;
+
   --font-sans:
     ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --font-mono:
     ui-monospace, 'SF Mono', 'JetBrains Mono', 'Cascadia Mono', 'Roboto Mono', Menlo, Consolas,
     monospace;
+
+  /* Six sizes, no more. Code never drops below 14px: it is read on a phone. */
+  --text-display: 1.35rem;
+  --text-display--line-height: 1.32;
+  --text-lg: 1.0625rem;
+  --text-lg--line-height: 1.4;
+  --text-base: 0.9375rem;
+  --text-base--line-height: 1.55;
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: 1.5;
+  --text-meta: 0.6875rem;
+  --text-meta--line-height: 1.45;
+  --text-code: 0.875rem;
+  --text-code--line-height: 1.55;
 }
 
 @layer base {
@@ -110,6 +134,8 @@
     background-color: var(--ground);
     color: var(--ink);
     font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: 1.55;
     /* The page itself never scrolls sideways at 380px. Wide content scrolls
        inside its own container instead. */
     overflow-x: hidden;
@@ -117,17 +143,28 @@
     -webkit-tap-highlight-color: transparent;
   }
 
-  /* Every interactive element keeps a visible focus ring, including on dark. */
+  /* Every interactive element keeps a visible focus ring, on both themes. */
   :focus-visible {
     outline: 2px solid var(--focus);
     outline-offset: 2px;
-    border-radius: 2px;
+    border-radius: var(--radius);
   }
 
-  button {
+  button,
+  input,
+  select,
+  textarea {
     font: inherit;
     color: inherit;
     touch-action: manipulation;
+  }
+
+  /* Counts and identifiers must not jitter as they tick. */
+  .font-mono,
+  code,
+  th,
+  td {
+    font-variant-numeric: tabular-nums;
   }
 
   ::selection {
@@ -147,31 +184,65 @@
   }
 }
 
-/* -------------------------------------------------------------- markdown ---
-   Content comes from the source files as GitHub flavoured markdown, so prose,
-   tables and code all need styling in one place. Tables scroll inside their own
-   wrapper, which is what keeps a 380px viewport free of horizontal page scroll.
+/* ------------------------------------------------------------- primitives ---
+   The ledger vocabulary. Rules rather than boxes, one gutter width, no shadow.
 */
-.prose-content {
-  font-size: 0.975rem;
-  line-height: 1.6;
-  color: var(--ink);
-  overflow-wrap: break-word;
+
+/* A block of sheet with a hairline around it. The only real container. */
+.sheet {
+  background: var(--sheet);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
 }
 
-.prose-content > * + * {
-  margin-top: 0.75rem;
+/* A list of ruled rows on one sheet, the way a ledger stacks entries. */
+.ruled > * + * {
+  border-top: 1px solid var(--rule);
 }
 
-/* The question side of a drill card, sized to be read at arm's length. */
-.prose-content.prose-lead {
-  font-size: 1.1rem;
-  font-weight: 600;
-  line-height: 1.4;
-  letter-spacing: -0.01em;
+/* Identifier column on the left, content on the right. */
+.gutter-row {
+  display: grid;
+  grid-template-columns: var(--gutter) 1fr;
+  gap: 0.5rem;
 }
 
-/* The only motion in the app, and it stops under prefers-reduced-motion. */
+/* Monospaced data: identifiers, counts, timestamps, severities. */
+.data {
+  font-family: var(--font-mono);
+  font-size: var(--text-meta);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: var(--ink-faint);
+}
+
+/* A section label, the small ruled heading above a block. */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: var(--text-meta);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+/* A bordered mono tag. Used where a flag would otherwise need a colour alone. */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  padding: 0 0.3rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-meta);
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+  color: var(--ink-muted);
+}
+
+/* ---------------------------------------------------------------- motion ---
+   The card reveal is the only animation in the app, and it stops entirely
+   under prefers-reduced-motion via the rule above.
+*/
 @keyframes reveal-in {
   from {
     opacity: 0;
@@ -187,6 +258,30 @@
   animation: reveal-in 160ms ease-out;
 }
 
+/* -------------------------------------------------------------- markdown ---
+   Content comes from the source files as GitHub flavoured markdown, so prose,
+   tables and code all need styling in one place. Tables scroll inside their own
+   wrapper, which is what keeps a 380px viewport free of horizontal page scroll.
+*/
+.prose-content {
+  font-size: var(--text-base);
+  line-height: 1.6;
+  color: var(--ink);
+  overflow-wrap: break-word;
+}
+
+.prose-content > * + * {
+  margin-top: 0.7rem;
+}
+
+/* The question side of a drill card, sized to be read at arm's length. */
+.prose-content.prose-lead {
+  font-size: var(--text-display);
+  font-weight: 600;
+  line-height: 1.32;
+  letter-spacing: -0.011em;
+}
+
 .prose-content h1,
 .prose-content h2,
 .prose-content h3,
@@ -194,26 +289,29 @@
   font-weight: 650;
   line-height: 1.3;
   letter-spacing: -0.01em;
-  margin-top: 1.5rem;
+  margin-top: 1.4rem;
 }
 
 .prose-content h1 {
-  font-size: 1.2rem;
+  font-size: var(--text-lg);
 }
 .prose-content h2 {
-  font-size: 1.1rem;
+  font-size: var(--text-lg);
 }
 .prose-content h3 {
-  font-size: 1rem;
+  font-size: var(--text-base);
 }
 .prose-content h4 {
-  font-size: 0.95rem;
+  font-size: var(--text-sm);
   color: var(--ink-muted);
+  font-family: var(--font-mono);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 
 .prose-content ul,
 .prose-content ol {
-  padding-left: 1.25rem;
+  padding-left: 1.15rem;
 }
 .prose-content ul {
   list-style: disc;
@@ -222,7 +320,7 @@
   list-style: decimal;
 }
 .prose-content li + li {
-  margin-top: 0.3rem;
+  margin-top: 0.28rem;
 }
 
 .prose-content a {
@@ -236,32 +334,33 @@
 }
 
 .prose-content blockquote {
-  border-left: 2px solid var(--line-strong);
+  border-left: 2px solid var(--rule-strong);
   padding-left: 0.75rem;
   color: var(--ink-muted);
 }
 
 .prose-content hr {
   border: 0;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--rule);
 }
 
 /* Inline code: the source files lean on it heavily for identifiers. */
 .prose-content code {
   font-family: var(--font-mono);
-  font-size: 0.86em;
-  background: var(--surface-2);
-  border: 1px solid var(--line);
-  border-radius: 3px;
-  padding: 0.08em 0.3em;
+  font-size: 0.87em;
+  background: var(--sheet-raised);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.08em 0.28em;
   overflow-wrap: break-word;
 }
 
 .prose-content pre {
-  background: var(--surface-2);
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 0.7rem 0.8rem;
+  background: var(--sheet-raised);
+  border: 1px solid var(--rule);
+  border-left: 2px solid var(--rule-strong);
+  border-radius: var(--radius);
+  padding: 0.65rem 0.75rem;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
@@ -271,7 +370,7 @@
   background: none;
   border: 0;
   padding: 0;
-  font-size: 0.875rem; /* 14px, the size the user reads SQL at on a phone */
+  font-size: var(--text-code);
   line-height: 1.55;
   white-space: pre;
 }
@@ -279,19 +378,19 @@
 .table-scroll {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-  border: 1px solid var(--line);
-  border-radius: 4px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
 }
 
 .prose-content table {
   border-collapse: collapse;
   min-width: 100%;
-  font-size: 0.875rem;
+  font-size: var(--text-sm);
 }
 
 .prose-content th,
 .prose-content td {
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--rule);
   padding: 0.4rem 0.6rem;
   text-align: left;
   vertical-align: top;
@@ -299,8 +398,12 @@
 }
 
 .prose-content th {
-  background: var(--surface-2);
+  background: var(--sheet-raised);
+  font-family: var(--font-mono);
+  font-size: var(--text-meta);
   font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   color: var(--ink-muted);
 }
 
@@ -309,8 +412,8 @@
 }
 
 /* ------------------------------------------------------------ code colour ---
-   highlight.js tokens, driven by the same variables as everything else so that
-   one theme switch covers code too.
+   highlight.js tokens, driven by the same variables as everything else so one
+   theme switch covers code too.
 */
 .hljs-comment,
 .hljs-quote {

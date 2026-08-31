@@ -124,7 +124,7 @@ export function Practice() {
               sectionId: event.target.value === 'all' ? null : Number(event.target.value),
             }))
           }
-          className="min-h-11 max-w-[13rem] flex-1 truncate rounded border border-line bg-surface2 px-2 text-sm"
+          className="min-h-11 max-w-[13rem] flex-1 truncate rounded-sm border border-rule bg-raised px-2 text-sm"
         >
           <option value="all">All sections</option>
           {sections.map((section) => (
@@ -133,7 +133,7 @@ export function Practice() {
             </option>
           ))}
         </select>
-        <span className="font-mono text-[11px] text-faint">
+        <span className="data">
           {remaining} left{reviewCount > 0 ? `, ${reviewCount} in review` : ''}
         </span>
       </div>
@@ -160,7 +160,7 @@ export function Practice() {
 
       {question ? (
         <article className="mt-4">
-          <div className="flex flex-wrap items-center gap-2 font-mono text-[11px] text-faint">
+          <div className="flex flex-wrap items-center gap-2 data">
             <span>{question.id}</span>
             <span>{question.difficulty}</span>
             <span>{question.format}</span>
@@ -168,7 +168,7 @@ export function Practice() {
             {level === 3 && !answered ? <span className="text-medium">{elapsed}s</span> : null}
           </div>
 
-          <div className="mt-3 border border-line bg-surface p-3">
+          <div className="mt-3 sheet p-3">
             <Markdown>{question.format === 'MCQ' ? question.stem : question.prompt}</Markdown>
           </div>
 
@@ -234,8 +234,8 @@ function FormatChip({ label, active, onClick }: { label: string; active: boolean
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`min-h-9 rounded-full border px-3 text-xs ${
-        active ? 'border-accent bg-accent-soft text-ink' : 'border-line bg-surface2 text-muted hover:text-ink'
+      className={`min-h-9 rounded-sm border px-3 text-xs ${
+        active ? 'border-accent bg-accent-soft text-ink' : 'border-rule bg-raised text-muted hover:text-ink'
       }`}
     >
       {label}
@@ -271,11 +271,11 @@ function LookItUp({
 
   if (level === 1 || open) {
     return (
-      <details className="mt-2 border border-line bg-surface" open={level === 1}>
+      <details className="mt-2 sheet" open={level === 1}>
         <summary className="flex min-h-11 cursor-pointer items-center px-3 text-sm font-semibold text-accent">
           Teach me this first: {article.title}
         </summary>
-        <div className="border-t border-line px-3 pb-3">
+        <div className="border-t border-rule px-3 pb-3">
           <Markdown className="mt-2">{article.markdown}</Markdown>
         </div>
       </details>
@@ -286,7 +286,7 @@ function LookItUp({
     <button
       type="button"
       onClick={onOpen}
-      className="mt-2 min-h-11 w-full rounded border border-line px-3 text-sm text-muted hover:text-ink"
+      className="mt-2 min-h-11 w-full rounded-sm border border-rule px-3 text-sm text-muted hover:text-ink"
     >
       Hint: look it up in {article.title}
     </button>
@@ -295,14 +295,14 @@ function LookItUp({
 
 function SqlHandoff() {
   return (
-    <div className="mt-3 border border-line bg-surface p-3">
+    <div className="mt-3 sheet p-3">
       <p className="text-sm text-muted">
         Queries are answered in the sandbox, where they run against real data and are graded on the rows
         they return.
       </p>
       <Link
         to="/sandbox"
-        className="mt-3 flex min-h-12 items-center justify-center rounded bg-accent px-4 text-sm font-semibold text-accent-ink"
+        className="mt-3 flex min-h-12 items-center justify-center rounded-sm bg-accent px-4 text-sm font-semibold text-accent-ink"
       >
         Open the query sandbox
       </Link>
@@ -333,17 +333,17 @@ function MultipleChoice({
         const isPicked = picked === index
         const showState = answered && (isPicked || isCorrect)
         const tone = !showState
-          ? 'border-line bg-surface'
+          ? 'border-rule bg-sheet'
           : isCorrect
-            ? 'border-easy bg-surface'
-            : 'border-missed bg-surface'
+            ? 'border-easy bg-sheet'
+            : 'border-missed bg-sheet'
         return (
           <li key={letter || index}>
             <button
               type="button"
               disabled={answered}
               onClick={() => onPick(index, isCorrect)}
-              className={`flex w-full items-start gap-3 rounded border p-3 text-left text-sm ${tone} disabled:cursor-default`}
+              className={`flex w-full items-start gap-3 rounded-sm border p-3 text-left text-sm ${tone} disabled:cursor-default`}
             >
               <span className="font-mono text-xs text-muted">{letter}</span>
               <span className="flex-1">{option}</span>
@@ -390,7 +390,7 @@ function WrittenAnswer({
           value={value}
           onChange={(event) => onChange(event.target.value)}
           rows={5}
-          className={`mt-1 w-full resize-y rounded border border-line bg-surface2 p-3 text-sm ${
+          className={`mt-1 w-full resize-y rounded-sm border border-rule bg-raised p-3 text-sm ${
             question.format === 'Python' ? 'font-mono' : ''
           }`}
           spellCheck={question.format !== 'Python'}
@@ -402,7 +402,7 @@ function WrittenAnswer({
       <button
         type="button"
         onClick={onReveal}
-        className="mt-2 min-h-12 w-full rounded bg-accent text-sm font-semibold text-accent-ink"
+        className="mt-2 min-h-12 w-full rounded-sm bg-accent text-sm font-semibold text-accent-ink"
       >
         Show the model answer
       </button>
@@ -436,20 +436,20 @@ function Explanation({
   return (
     <div className="mt-4">
       {written.trim().length > 0 ? (
-        <div className="border border-line bg-surface p-3">
-          <p className="font-mono text-xs tracking-wide text-muted uppercase">What you wrote</p>
+        <div className="sheet p-3">
+          <p className="eyebrow">What you wrote</p>
           <p className="mt-1 text-sm whitespace-pre-wrap">{written}</p>
         </div>
       ) : null}
 
-      <div className="mt-2 border border-line bg-surface p-3">
-        <p className="font-mono text-xs tracking-wide text-muted uppercase">Model answer</p>
+      <div className="mt-2 sheet p-3">
+        <p className="eyebrow">Model answer</p>
         <Markdown className="mt-2">{question.answer}</Markdown>
       </div>
 
       {question.promptCode && question.answerCode ? (
-        <div className="mt-2 border border-line bg-surface p-3">
-          <p className="font-mono text-xs tracking-wide text-muted uppercase">What changed, line by line</p>
+        <div className="mt-2 sheet p-3">
+          <p className="eyebrow">What changed, line by line</p>
           <div className="mt-2">
             <CodeDiff before={question.promptCode} after={question.answerCode} />
           </div>
@@ -458,14 +458,14 @@ function Explanation({
 
       {askWhy ? (
         showWhy ? (
-          <p className="mt-2 border-l-2 border-accent bg-surface p-3 text-sm text-muted">
+          <p className="mt-2 border-l-2 border-accent bg-sheet p-3 text-sm text-muted">
             The reasoning is in the model answer above. Say it back in your own words before moving on.
           </p>
         ) : (
           <button
             type="button"
             onClick={onWhy}
-            className="mt-2 min-h-11 w-full rounded border border-line text-sm text-muted hover:text-ink"
+            className="mt-2 min-h-11 w-full rounded-sm border border-rule text-sm text-muted hover:text-ink"
           >
             Why is that true?
           </button>
@@ -489,7 +489,7 @@ function Explanation({
                 })
                 onNext()
               }}
-              className={`min-h-14 rounded border bg-surface2 px-1 text-[13px] font-semibold ${option.tone}`}
+              className={`min-h-14 rounded-sm border bg-raised px-1 text-[13px] font-semibold ${option.tone}`}
             >
               {option.label}
             </button>
@@ -499,7 +499,7 @@ function Explanation({
         <button
           type="button"
           onClick={onNext}
-          className="mt-3 min-h-14 w-full rounded bg-accent text-base font-semibold text-accent-ink"
+          className="mt-3 min-h-14 w-full rounded-sm bg-accent text-base font-semibold text-accent-ink"
         >
           Next question
         </button>
@@ -535,7 +535,7 @@ function EmptyPractice({
         <button
           type="button"
           onClick={onClearFilters}
-          className="min-h-12 w-full rounded bg-accent text-sm font-semibold text-accent-ink"
+          className="min-h-12 w-full rounded-sm bg-accent text-sm font-semibold text-accent-ink"
         >
           Clear the filters
         </button>
@@ -543,7 +543,7 @@ function EmptyPractice({
           <button
             type="button"
             onClick={onRestart}
-            className="min-h-12 w-full rounded border border-line text-sm text-muted hover:text-ink"
+            className="min-h-12 w-full rounded-sm border border-rule text-sm text-muted hover:text-ink"
           >
             Start the set again
           </button>

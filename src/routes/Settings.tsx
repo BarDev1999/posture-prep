@@ -31,9 +31,9 @@ export function Settings() {
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-4">
-      <h1 className="font-mono text-xs tracking-[0.14em] text-muted uppercase">Settings</h1>
+      <h1 className="eyebrow">Settings</h1>
 
-      <section className="mt-3 border border-line bg-surface p-4">
+      <section className="mt-3 sheet p-4">
         <h2 className="text-sm font-semibold">Exam date</h2>
         <p className="mt-1 text-xs text-muted">
           Drives the countdown on the home screen. Defaults to {DEFAULT_EXAM_DATE}.
@@ -46,14 +46,14 @@ export function Settings() {
               dispatch({ type: 'set-exam-date', examDate: event.target.value })
             }
           }}
-          className="mt-3 min-h-12 w-full rounded border border-line bg-surface2 px-3 text-base"
+          className="mt-3 min-h-12 w-full rounded-sm border border-rule bg-raised px-3 text-base"
         />
         <p className="mt-2 font-mono text-xs text-faint">
           {daysLeft >= 0 ? `${daysLeft} days from today` : `${Math.abs(daysLeft)} days ago`}
         </p>
       </section>
 
-      <section className="mt-4 border border-line bg-surface p-4">
+      <section className="mt-4 sheet p-4">
         <h2 className="text-sm font-semibold">Difficulty</h2>
         <p className="mt-1 text-xs text-muted">Also reachable from More on the bottom bar, on any screen.</p>
         <div className="mt-3 grid grid-cols-3 gap-2">
@@ -63,10 +63,10 @@ export function Settings() {
               type="button"
               aria-pressed={progress.settings.level === level.value}
               onClick={() => dispatch({ type: 'set-level', level: level.value })}
-              className={`min-h-12 rounded border px-2 text-xs font-semibold ${
+              className={`min-h-12 rounded-sm border px-2 text-xs font-semibold ${
                 progress.settings.level === level.value
                   ? 'border-accent bg-accent-soft text-ink'
-                  : 'border-line bg-surface2 text-muted hover:text-ink'
+                  : 'border-rule bg-raised text-muted hover:text-ink'
               }`}
             >
               {level.name}
@@ -75,7 +75,7 @@ export function Settings() {
         </div>
       </section>
 
-      <section className="mt-4 border border-line bg-surface p-4">
+      <section className="mt-4 sheet p-4">
         <h2 className="text-sm font-semibold">Appearance</h2>
         <p className="mt-1 text-xs text-muted">System follows the phone setting.</p>
         <div className="mt-3 grid grid-cols-3 gap-2">
@@ -85,10 +85,10 @@ export function Settings() {
               type="button"
               aria-pressed={progress.settings.theme === theme.value}
               onClick={() => dispatch({ type: 'set-theme', theme: theme.value })}
-              className={`min-h-12 rounded border px-2 text-xs font-semibold ${
+              className={`min-h-12 rounded-sm border px-2 text-xs font-semibold ${
                 progress.settings.theme === theme.value
                   ? 'border-accent bg-accent-soft text-ink'
-                  : 'border-line bg-surface2 text-muted hover:text-ink'
+                  : 'border-rule bg-raised text-muted hover:text-ink'
               }`}
             >
               {theme.label}
@@ -101,7 +101,7 @@ export function Settings() {
 
       <ExtraContent extraFacts={progress.extraFacts} />
 
-      <section className="mt-4 border border-line bg-surface p-4">
+      <section className="mt-4 sheet p-4">
         <h2 className="text-sm font-semibold">Content</h2>
         <dl className="mt-2 grid grid-cols-2 gap-y-1 font-mono text-xs text-muted">
           <dt>Facts</dt>
@@ -164,7 +164,7 @@ function ExportImport({ state }: { state: ProgressState }) {
   }
 
   return (
-    <section className="mt-4 border border-line bg-surface p-4">
+    <section className="mt-4 sheet p-4">
       <h2 className="text-sm font-semibold">Your progress</h2>
       <p className="mt-1 text-xs leading-relaxed text-muted">
         There is no account and no server, so this is how progress moves between the phone and a
@@ -174,7 +174,7 @@ function ExportImport({ state }: { state: ProgressState }) {
       <button
         type="button"
         onClick={download}
-        className="mt-3 min-h-12 w-full rounded border border-line text-sm font-semibold hover:border-line-strong"
+        className="mt-3 min-h-12 w-full rounded-sm border border-rule text-sm font-semibold hover:border-rule-strong"
       >
         Export progress as a file
       </button>
@@ -193,7 +193,7 @@ function ExportImport({ state }: { state: ProgressState }) {
       <button
         type="button"
         onClick={() => fileRef.current?.click()}
-        className="mt-2 min-h-12 w-full rounded border border-line text-sm font-semibold hover:border-line-strong"
+        className="mt-2 min-h-12 w-full rounded-sm border border-rule text-sm font-semibold hover:border-rule-strong"
       >
         Import a progress file
       </button>
@@ -202,7 +202,7 @@ function ExportImport({ state }: { state: ProgressState }) {
       {done ? <p className="mt-3 text-sm text-easy">{done}</p> : null}
 
       {pending ? (
-        <div className="mt-3 border border-hard/60 bg-surface2 p-3">
+        <div className="mt-3 border border-hard/60 bg-raised p-3">
           <p className="text-sm font-semibold">Replace everything with {pending.name}?</p>
           <p className="mt-1 text-xs text-muted">
             This overwrites what is on this device. Export first if you want to keep it.
@@ -237,7 +237,7 @@ function ExportImport({ state }: { state: ProgressState }) {
             <button
               type="button"
               onClick={() => setPending(null)}
-              className="min-h-12 flex-1 rounded border border-line text-sm"
+              className="min-h-12 flex-1 rounded-sm border border-rule text-sm"
             >
               Cancel
             </button>
@@ -248,7 +248,7 @@ function ExportImport({ state }: { state: ProgressState }) {
                 setDone(`Restored from ${pending.name}`)
                 setPending(null)
               }}
-              className="min-h-12 flex-1 rounded bg-accent text-sm font-semibold text-accent-ink"
+              className="min-h-12 flex-1 rounded-sm bg-accent text-sm font-semibold text-accent-ink"
             >
               Replace
             </button>
@@ -284,7 +284,7 @@ function ExtraContent({ extraFacts }: { extraFacts: ExtraFact[] }) {
   }
 
   return (
-    <section className="mt-4 border border-line bg-surface p-4">
+    <section className="mt-4 sheet p-4">
       <h2 className="text-sm font-semibold">Add more facts</h2>
       <p className="mt-1 text-xs leading-relaxed text-muted">
         A markdown file in the same shape as the fact deck: a section heading, then numbered questions
@@ -306,13 +306,13 @@ function ExtraContent({ extraFacts }: { extraFacts: ExtraFact[] }) {
       <button
         type="button"
         onClick={() => fileRef.current?.click()}
-        className="mt-3 min-h-12 w-full rounded border border-line text-sm font-semibold hover:border-line-strong"
+        className="mt-3 min-h-12 w-full rounded-sm border border-rule text-sm font-semibold hover:border-rule-strong"
       >
         Import a fact file
       </button>
 
       {error ? (
-        <div className="mt-3 border border-critical/60 bg-surface2 p-3">
+        <div className="mt-3 border border-critical/60 bg-raised p-3">
           <p className="text-sm text-critical">{error.message}</p>
           <pre className="mt-2 overflow-x-auto font-mono text-[11px] whitespace-pre-wrap text-muted">
             {error.hint}
@@ -322,11 +322,11 @@ function ExtraContent({ extraFacts }: { extraFacts: ExtraFact[] }) {
       {done ? <p className="mt-3 text-sm text-easy">{done}</p> : null}
 
       {pending ? (
-        <div className="mt-3 border border-accent/60 bg-surface2 p-3">
+        <div className="mt-3 border border-accent/60 bg-raised p-3">
           <p className="text-sm font-semibold">
             {pending.facts.length} {pending.facts.length === 1 ? 'fact' : 'facts'} found in {pending.name}
           </p>
-          <p className="mt-1 font-mono text-[11px] text-faint">
+          <p className="mt-1 data">
             {pending.facts.filter((fact) => fact.isPriority).length} flagged priority, across sections{' '}
             {[...new Set(pending.facts.map((fact) => fact.section))].sort().join(', ')}
           </p>
@@ -341,7 +341,7 @@ function ExtraContent({ extraFacts }: { extraFacts: ExtraFact[] }) {
             <button
               type="button"
               onClick={() => setPending(null)}
-              className="min-h-12 flex-1 rounded border border-line text-sm"
+              className="min-h-12 flex-1 rounded-sm border border-rule text-sm"
             >
               Cancel
             </button>
@@ -352,7 +352,7 @@ function ExtraContent({ extraFacts }: { extraFacts: ExtraFact[] }) {
                 setDone(`Added ${pending.facts.length} facts from ${pending.name}`)
                 setPending(null)
               }}
-              className="min-h-12 flex-1 rounded bg-accent text-sm font-semibold text-accent-ink"
+              className="min-h-12 flex-1 rounded-sm bg-accent text-sm font-semibold text-accent-ink"
             >
               Add to the deck
             </button>
@@ -363,10 +363,10 @@ function ExtraContent({ extraFacts }: { extraFacts: ExtraFact[] }) {
       {sources.length > 0 ? (
         <ul className="mt-3 space-y-1">
           {sources.map((source) => (
-            <li key={source} className="flex items-center justify-between gap-3 border-t border-line pt-2">
+            <li key={source} className="flex items-center justify-between gap-3 border-t border-rule pt-2">
               <span className="truncate text-xs">
                 {source}
-                <span className="ml-2 font-mono text-[11px] text-faint">
+                <span className="ml-2 data">
                   {extraFacts.filter((fact) => fact.sourceName === source).length} facts
                 </span>
               </span>
@@ -395,14 +395,14 @@ function ResetProgress() {
 
   if (done) {
     return (
-      <section className="mt-4 border border-line bg-surface p-4">
+      <section className="mt-4 sheet p-4">
         <p className="text-sm text-muted">Progress reset. Settings were kept.</p>
       </section>
     )
   }
 
   return (
-    <section className="mt-4 border border-critical/40 bg-surface p-4">
+    <section className="mt-4 border border-critical/40 bg-sheet p-4">
       <h2 className="text-sm font-semibold">Reset progress</h2>
       <p className="mt-1 text-xs leading-relaxed text-muted">
         Clears every box, attempt, session and mock result. Settings and imported facts stay. There is
@@ -413,7 +413,7 @@ function ResetProgress() {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="mt-3 min-h-12 w-full rounded border border-critical/60 text-sm font-semibold text-critical"
+          className="mt-3 min-h-12 w-full rounded-sm border border-critical/60 text-sm font-semibold text-critical"
         >
           Reset progress
         </button>
@@ -429,7 +429,7 @@ function ResetProgress() {
               autoCapitalize="off"
               autoCorrect="off"
               spellCheck={false}
-              className="mt-1 min-h-12 w-full rounded border border-line bg-surface2 px-3 font-mono text-base"
+              className="mt-1 min-h-12 w-full rounded-sm border border-rule bg-raised px-3 font-mono text-base"
             />
           </label>
           <div className="mt-2 flex gap-2">
@@ -439,7 +439,7 @@ function ResetProgress() {
                 setOpen(false)
                 setTyped('')
               }}
-              className="min-h-12 flex-1 rounded border border-line text-sm"
+              className="min-h-12 flex-1 rounded-sm border border-rule text-sm"
             >
               Cancel
             </button>
@@ -450,7 +450,7 @@ function ResetProgress() {
                 dispatch({ type: 'reset' })
                 setDone(true)
               }}
-              className="min-h-12 flex-1 rounded bg-critical text-sm font-semibold text-white disabled:opacity-40"
+              className="min-h-12 flex-1 rounded-sm bg-critical text-sm font-semibold text-white disabled:opacity-40"
             >
               Reset everything
             </button>

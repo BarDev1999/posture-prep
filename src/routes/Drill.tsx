@@ -18,10 +18,10 @@ import type { FactProgress, Rating } from '../types/progress.ts'
  */
 
 const RATINGS: { value: Rating; label: string; tone: string }[] = [
-  { value: 'missed', label: 'Missed it', tone: 'text-missed border-missed/50' },
-  { value: 'hard', label: 'Hard', tone: 'text-hard border-hard/50' },
-  { value: 'got', label: 'Got it', tone: 'text-got border-got/50' },
-  { value: 'easy', label: 'Easy', tone: 'text-easy border-easy/50' },
+  { value: 'missed', label: 'Missed it', tone: 'text-missed border-missed/60' },
+  { value: 'hard', label: 'Hard', tone: 'text-hard border-hard/60' },
+  { value: 'got', label: 'Got it', tone: 'text-got border-got/60' },
+  { value: 'easy', label: 'Easy', tone: 'text-easy border-easy/60' },
 ]
 
 const SWIPE_THRESHOLD = 64
@@ -168,7 +168,7 @@ export function Drill() {
 
   return (
     <div className="mx-auto flex h-full w-full max-w-lg flex-col">
-      <div className="shrink-0 border-b border-line bg-surface px-4 py-2">
+      <div className="shrink-0 border-b border-rule bg-sheet px-4 py-2">
         <div className="flex items-center justify-between gap-2">
           <label className="flex min-h-11 items-center gap-2 text-sm">
             <input
@@ -190,7 +190,7 @@ export function Drill() {
                   value: event.target.value === 'all' ? null : Number(event.target.value),
                 })
               }
-              className="max-w-[11rem] truncate rounded border border-line bg-surface2 px-2 py-2 text-sm"
+              className="max-w-[11rem] truncate rounded-sm border border-rule bg-raised px-2 py-2 text-sm"
             >
               <option value="all">All sections</option>
               {sections.map((section) => (
@@ -202,7 +202,7 @@ export function Drill() {
           </label>
         </div>
 
-        <div className="mt-1 flex gap-3 font-mono text-[11px] text-faint">
+        <div className="data mt-1 flex gap-3">
           <span>{live.dueCount} due today</span>
           <span>{live.unseenCount} new</span>
           <span>{completed} done</span>
@@ -213,7 +213,7 @@ export function Drill() {
       {fact ? (
         <>
           <div
-            className="min-h-0 flex-1 overflow-y-auto px-4 py-5"
+            className="flex min-h-0 flex-1 flex-col justify-center overflow-y-auto px-4 py-5"
             style={{ touchAction: 'pan-y' }}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
@@ -221,73 +221,80 @@ export function Drill() {
             onPointerCancel={endPointer}
           >
             <div
-              className="mx-auto max-w-lg"
+              className="mx-auto w-full max-w-lg"
               style={{ transform: dragX === 0 ? undefined : `translateX(${Math.max(-90, Math.min(90, dragX))}px)` }}
             >
-              <div className="flex items-center gap-2 font-mono text-[11px] text-faint">
-                <span>{fact.id}</span>
-                <span>section {fact.section}</span>
-                {fact.isPriority ? <span className="text-accent">priority</span> : null}
-                {factProgress && factProgress.reviewCount > 0 ? (
-                  <span>
-                    box {factProgress.box} of 5, back in {boxInterval(factProgress.box)}d
-                  </span>
-                ) : (
-                  <span>new card</span>
-                )}
-              </div>
-
-              <div className="mt-3" role="heading" aria-level={1}>
-                <Markdown className="prose-lead">{fact.front}</Markdown>
-              </div>
-
-              {revealed ? (
-                <div className="reveal mt-5 border-t border-line pt-4">
-                  <Markdown>{fact.back}</Markdown>
+              {/* The gutter carries the identifier and the schedule, the way a
+                  ledger carries a line number, and keeps the question itself clear. */}
+              <div className="gutter-row">
+                <div className="data pt-1 text-right leading-tight">
+                  <div className="text-ink">{fact.id}</div>
+                  <div>s{fact.section}</div>
                 </div>
-              ) : (
-                <p className="mt-5 text-sm text-faint">
-                  Answer it out loud first, then reveal. Swipe or press the button.
-                </p>
-              )}
 
-              {swipeHint ? (
-                <p className="mt-4 font-mono text-xs text-accent" aria-hidden="true">
-                  {swipeHint}
-                </p>
-              ) : null}
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {fact.isPriority ? <span className="tag border-accent/60 text-accent">priority</span> : null}
+                    <span className="tag">
+                      {factProgress && factProgress.reviewCount > 0
+                        ? `box ${factProgress.box}/5, back in ${boxInterval(factProgress.box)}d`
+                        : 'new card'}
+                    </span>
+                  </div>
+
+                  <div className="mt-3" role="heading" aria-level={1}>
+                    <Markdown className="prose-lead">{fact.front}</Markdown>
+                  </div>
+
+                  {revealed ? (
+                    <div className="reveal mt-4 border-t border-rule pt-3">
+                      <Markdown>{fact.back}</Markdown>
+                    </div>
+                  ) : (
+                    <p className="mt-4 text-sm text-faint">
+                      Answer it out loud first, then reveal. Swipe, or press the button.
+                    </p>
+                  )}
+
+                  {swipeHint ? (
+                    <p className="data mt-3 text-accent" aria-hidden="true">
+                      {swipeHint}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="shrink-0 border-t border-line bg-surface px-3 pt-3 pb-3">
+          <div className="shrink-0 border-t border-rule bg-sheet px-3 pt-3 pb-3">
             {revealed ? (
               <>
-                <div className="grid grid-cols-4 gap-2">
+                {/* Four targets across a 380px screen, each above the 44px floor
+                    and within one thumb's reach at the bottom of the phone. */}
+                <div className="grid grid-cols-4 gap-1.5">
                   {RATINGS.map((rating) => (
                     <button
                       key={rating.value}
                       type="button"
                       onClick={() => rate(rating.value)}
-                      className={`min-h-14 rounded border bg-surface2 px-1 text-[13px] font-semibold ${rating.tone} hover:bg-ground`}
+                      className={`min-h-14 border-2 bg-raised px-0.5 text-[13px] leading-tight font-semibold hover:bg-ground ${rating.tone}`}
                     >
                       {rating.label}
                     </button>
                   ))}
                 </div>
-                <p className="mt-2 text-center text-[11px] text-faint">
-                  Swipe right for Got it, left for Missed it.
-                </p>
+                <p className="data mt-2 text-center">Swipe right for Got it, left for Missed it.</p>
               </>
             ) : (
               <>
                 <button
                   type="button"
                   onClick={() => setRevealed(true)}
-                  className="min-h-14 w-full rounded bg-accent text-base font-semibold text-accent-ink hover:opacity-90"
+                  className="min-h-14 w-full bg-accent text-base font-semibold text-accent-ink hover:opacity-90"
                 >
                   Show answer
                 </button>
-                <p className="mt-2 text-center text-[11px] text-faint">Retrieval first. Guess before you look.</p>
+                <p className="data mt-2 text-center">Retrieval first. Guess before you look.</p>
               </>
             )}
           </div>
@@ -393,7 +400,7 @@ function EmptyState({
           <button
             type="button"
             onClick={onDrillEverything}
-            className="min-h-14 w-full rounded bg-accent text-base font-semibold text-accent-ink hover:opacity-90"
+            className="min-h-14 w-full rounded-sm bg-accent text-base font-semibold text-accent-ink hover:opacity-90"
           >
             Drill every section
           </button>
@@ -401,7 +408,7 @@ function EmptyState({
           <button
             type="button"
             onClick={onDrillPriority}
-            className="min-h-14 w-full rounded bg-accent text-base font-semibold text-accent-ink hover:opacity-90"
+            className="min-h-14 w-full rounded-sm bg-accent text-base font-semibold text-accent-ink hover:opacity-90"
           >
             Drill the priority list
           </button>
@@ -411,7 +418,7 @@ function EmptyState({
           <button
             type="button"
             onClick={onDrillAhead}
-            className="min-h-12 w-full rounded border border-line text-sm text-muted hover:text-ink"
+            className="min-h-12 w-full rounded-sm border border-rule text-sm text-muted hover:text-ink"
           >
             Drill ahead of schedule ({laterCount} cards)
           </button>
@@ -420,7 +427,7 @@ function EmptyState({
         <button
           type="button"
           onClick={onHome}
-          className="min-h-12 w-full rounded border border-line text-sm text-muted hover:text-ink"
+          className="min-h-12 w-full rounded-sm border border-rule text-sm text-muted hover:text-ink"
         >
           Back to home
         </button>

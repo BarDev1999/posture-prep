@@ -78,7 +78,7 @@ export function Explain() {
         </p>
         <Link
           to="/drill"
-          className="mx-auto mt-6 flex min-h-12 max-w-sm items-center justify-center rounded bg-accent text-sm font-semibold text-accent-ink"
+          className="mx-auto mt-6 flex min-h-12 max-w-sm items-center justify-center rounded-sm bg-accent text-sm font-semibold text-accent-ink"
         >
           Go to the fact drill
         </Link>
@@ -88,12 +88,12 @@ export function Explain() {
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-4">
-      <h1 className="font-mono text-xs tracking-[0.14em] text-muted uppercase">Explain it back</h1>
+      <h1 className="eyebrow">Explain it back</h1>
       <p className="mt-1 text-xs text-faint">
         {concept.origin} · {sectionTitle(concept.section)}
       </p>
 
-      <div className="mt-3 border border-line bg-surface p-3">
+      <div className="mt-3 sheet p-3">
         <Markdown className="prose-lead">{concept.title}</Markdown>
         <p className="mt-3 text-sm text-muted">
           Explain this in your own words, as if to someone who has never heard of it. No notes.
@@ -108,7 +108,7 @@ export function Explain() {
           rows={8}
           readOnly={revealed}
           placeholder="Say it the way you would to a colleague."
-          className="mt-1 w-full resize-y rounded border border-line bg-surface2 p-3 text-sm"
+          className="mt-1 w-full resize-y rounded-sm border border-rule bg-raised p-3 text-sm"
         />
       </label>
 
@@ -117,20 +117,20 @@ export function Explain() {
           type="button"
           onClick={() => setRevealed(true)}
           disabled={written.trim().length === 0}
-          className="min-h-14 w-full rounded bg-accent text-base font-semibold text-accent-ink disabled:opacity-50"
+          className="min-h-14 w-full rounded-sm bg-accent text-base font-semibold text-accent-ink disabled:opacity-50"
         >
           Compare with the model answer
         </button>
       ) : (
         <>
-          <div className="mt-2 border border-line bg-surface p-3">
-            <p className="font-mono text-xs tracking-wide text-muted uppercase">Model answer</p>
+          <div className="mt-2 sheet p-3">
+            <p className="eyebrow">Model answer</p>
             <Markdown className="mt-2">{concept.answer}</Markdown>
           </div>
 
           {points.length > 0 ? (
-            <div className="mt-2 border border-line bg-surface p-3">
-              <p className="font-mono text-xs tracking-wide text-muted uppercase">
+            <div className="mt-2 sheet p-3">
+              <p className="eyebrow">
                 Which of these did you cover?
               </p>
               <ul className="mt-2 space-y-1">
@@ -138,7 +138,7 @@ export function Explain() {
                   const checked = ticked.has(position)
                   return (
                     <li key={position}>
-                      <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded p-1 hover:bg-surface2">
+                      <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-sm p-1 hover:bg-raised">
                         <input
                           type="checkbox"
                           checked={checked}
@@ -160,7 +160,7 @@ export function Explain() {
                   )
                 })}
               </ul>
-              <p className="mt-2 font-mono text-[11px] text-faint">
+              <p className="mt-2 data">
                 {ticked.size} of {points.length} covered. Nothing is scored, and nothing is saved.
               </p>
             </div>
@@ -169,7 +169,7 @@ export function Explain() {
           <button
             type="button"
             onClick={nextConcept}
-            className="mt-3 min-h-14 w-full rounded bg-accent text-base font-semibold text-accent-ink"
+            className="mt-3 min-h-14 w-full rounded-sm bg-accent text-base font-semibold text-accent-ink"
           >
             Next concept
           </button>

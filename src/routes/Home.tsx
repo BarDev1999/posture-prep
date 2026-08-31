@@ -14,8 +14,11 @@ import {
 import { useAppDispatch, useProgress } from '../state/AppContext.tsx'
 
 /**
- * Home. Five section cards weighted by the exam blueprint, one prominent
- * action, days remaining, and the streak. Nothing else competes for attention.
+ * Home, read as a ledger: a rule of counts across the top, one action, then the
+ * five sections as ruled entries with their exam weight in the gutter.
+ *
+ * Weight is the real variable here, so it is shown as a number and as the
+ * length of a bar, not as five decorative colours.
  */
 export function Home() {
   const progress = useProgress()
@@ -45,8 +48,8 @@ export function Home() {
 
   return (
     <div className="mx-auto w-full max-w-lg px-4 py-4">
-      <section className="border border-line bg-surface">
-        <div className="grid grid-cols-3 divide-x divide-line border-b border-line">
+      <section className="sheet">
+        <div className="grid grid-cols-3 divide-x divide-rule border-b border-rule">
           <Stat label="Days left" value={daysLeft >= 0 ? String(daysLeft) : 'past'} />
           {/* Cards the session will serve today: scheduled reviews plus cards never seen. */}
           <Stat label="To drill" value={String(queue.dueCount + queue.unseenCount)} />
@@ -54,13 +57,13 @@ export function Home() {
         </div>
 
         <div className="p-4">
-          <p className="text-xs text-muted">{recommendation.headline}</p>
-          <p className="mt-1 text-sm leading-relaxed">{recommendation.detail}</p>
+          <p className="eyebrow">{recommendation.headline}</p>
+          <p className="mt-1.5 leading-relaxed">{recommendation.detail}</p>
 
           <button
             type="button"
             onClick={startSession}
-            className="mt-4 min-h-14 w-full rounded bg-accent px-4 text-base font-semibold text-accent-ink hover:opacity-90"
+            className="mt-4 min-h-14 w-full bg-accent px-4 text-base font-semibold text-accent-ink hover:opacity-90"
           >
             Start today's session
           </button>
@@ -69,13 +72,13 @@ export function Home() {
             <button
               type="button"
               onClick={() => drillSection(focus.section.id)}
-              className="mt-2 min-h-11 w-full rounded border border-line px-4 text-sm text-muted hover:text-ink"
+              className="mt-2 min-h-11 w-full border border-rule px-4 text-sm text-muted hover:border-rule-strong hover:text-ink"
             >
               Or drill {focus.section.title} only
             </button>
           ) : null}
 
-          <p className="mt-3 text-xs text-faint">
+          <p className="mt-3 text-sm text-faint">
             {todaySession
               ? `${todaySession.itemsCompleted} cards rated today.`
               : 'No cards rated today yet. A session is any number of cards.'}
@@ -83,47 +86,59 @@ export function Home() {
         </div>
       </section>
 
-      <h2 className="mt-6 mb-2 font-mono text-xs tracking-[0.14em] text-muted uppercase">Sections</h2>
+      <h2 className="eyebrow mt-6 mb-2">Sections, by exam weight</h2>
 
-      <ul className="space-y-2">
+      <ul className="sheet ruled">
         {stats.map((stat) => (
           <li key={stat.section.id}>
             <button
               type="button"
               onClick={() => drillSection(stat.section.id)}
-              className="block w-full border border-line bg-surface p-3 text-left hover:border-line-strong"
+              className="gutter-row w-full px-3 py-3 text-left hover:bg-raised"
             >
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="text-sm font-semibold">
-                  <span className="font-mono text-xs text-faint">{stat.section.id}. </span>
-                  {stat.section.title}
-                </span>
-                <span className="shrink-0 font-mono text-xs text-muted">{stat.section.weight}%</span>
-              </div>
+              <span className="data pt-0.5 text-right leading-none">
+                <span className="block text-[15px] text-ink">{stat.section.weight}</span>
+                <span className="block pt-1 text-[9px] tracking-[0.12em]">PCT</span>
+              </span>
 
-              <div className="mt-2">
-                <ProgressBar value={stat.progress} label={`${stat.section.title} progress`} />
-              </div>
+              <span className="min-w-0">
+                <span className="flex items-baseline justify-between gap-2">
+                  <span className="truncate text-sm font-semibold">
+                    <span className="data mr-1 text-faint">{stat.section.id}</span>
+                    {stat.section.title}
+                  </span>
+                  {/* Outstanding work, not cleared work, so this stays neutral.
+                      The accent means one thing in this app and it is not "todo". */}
+                  {stat.factsDue > 0 ? (
+                    <span className="data shrink-0 text-muted">{stat.factsDue} to drill</span>
+                  ) : (
+                    <span className="data shrink-0 text-accent">clear</span>
+                  )}
+                </span>
 
-              <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 font-mono text-[11px] text-faint">
-                <span>
-                  {stat.factsDrilled}/{stat.factsTotal} facts
+                <span className="mt-2 block">
+                  <ProgressBar value={stat.progress} label={`${stat.section.title} progress`} />
                 </span>
-                <span>
-                  {stat.questionsAttempted}/{stat.questionsTotal} questions
+
+                <span className="data mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5">
+                  <span>
+                    {stat.factsDrilled}/{stat.factsTotal} facts
+                  </span>
+                  <span>
+                    {stat.questionsAttempted}/{stat.questionsTotal} questions
+                  </span>
                 </span>
-                {stat.factsDue > 0 ? <span className="text-accent">{stat.factsDue} to drill</span> : null}
-              </div>
+              </span>
             </button>
           </li>
         ))}
       </ul>
 
-      <p className="mt-6 text-xs leading-relaxed text-faint">
+      <p className="mt-5 text-sm leading-relaxed text-faint">
         {content.counts.facts} facts and {content.counts.questions} questions parsed from the source
         files
         {progress.extraFacts.length > 0 ? `, plus ${progress.extraFacts.length} imported` : ''}.{' '}
-        <Link to="/settings" className="underline">
+        <Link to="/settings" className="underline underline-offset-2">
           Settings
         </Link>{' '}
         holds the exam date and your data.
@@ -135,8 +150,8 @@ export function Home() {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="px-3 py-3 text-center">
-      <div className="font-mono text-xl leading-none">{value}</div>
-      <div className="mt-1 text-[11px] text-faint">{label}</div>
+      <div className="font-mono text-2xl leading-none tracking-tight">{value}</div>
+      <div className="data mt-1.5">{label}</div>
     </div>
   )
 }

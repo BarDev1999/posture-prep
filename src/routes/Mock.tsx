@@ -149,7 +149,7 @@ function Setup({ attempts, onStart }: { attempts: MockAttempt[]; onStart: (varia
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-4">
-      <h1 className="font-mono text-xs tracking-[0.14em] text-muted uppercase">Mock exam</h1>
+      <h1 className="eyebrow">Mock exam</h1>
       <p className="mt-2 text-sm leading-relaxed text-muted">
         Closed book. No hints, no reference, and nothing is marked until you submit or the clock runs
         out. Multiple choice marks itself; you mark the written answers against the model answer.
@@ -159,7 +159,7 @@ function Setup({ attempts, onStart }: { attempts: MockAttempt[]; onStart: (varia
         <button
           type="button"
           onClick={() => onStart('full')}
-          className="w-full rounded bg-accent px-4 py-4 text-left text-accent-ink"
+          className="w-full rounded-sm bg-accent px-4 py-4 text-left text-accent-ink"
         >
           <span className="block text-base font-semibold">Full paper, 90 minutes</span>
           <span className="mt-0.5 block text-sm opacity-80">
@@ -170,7 +170,7 @@ function Setup({ attempts, onStart }: { attempts: MockAttempt[]; onStart: (varia
         <button
           type="button"
           onClick={() => onStart('short')}
-          className="w-full rounded border border-line bg-surface px-4 py-4 text-left"
+          className="w-full sheet px-4 py-4 text-left"
         >
           <span className="block text-base font-semibold">Short paper, 60 minutes</span>
           <span className="mt-0.5 block text-sm text-muted">
@@ -181,20 +181,20 @@ function Setup({ attempts, onStart }: { attempts: MockAttempt[]; onStart: (varia
 
       {previous.length > 0 ? (
         <>
-          <h2 className="mt-6 mb-2 font-mono text-xs tracking-[0.14em] text-muted uppercase">Past attempts</h2>
+          <h2 className="mt-6 mb-2 eyebrow">Past attempts</h2>
           <ul className="space-y-2">
             {previous.map((attempt, position) => {
               const older = previous[position + 1]
               const delta = older ? attempt.weightedScore - older.weightedScore : null
               return (
-                <li key={attempt.id} className="border border-line bg-surface p-3">
+                <li key={attempt.id} className="sheet p-3">
                   <div className="flex items-baseline justify-between gap-3">
                     <span className="text-sm font-semibold">{Math.round(attempt.weightedScore)}%</span>
-                    <span className="font-mono text-[11px] text-faint">
+                    <span className="data">
                       {attempt.date}, {attempt.variant} paper
                     </span>
                   </div>
-                  <div className="mt-1 flex flex-wrap gap-x-3 font-mono text-[11px] text-faint">
+                  <div className="mt-1 flex flex-wrap gap-x-3 data">
                     <span>
                       {attempt.rawCorrect} of {attempt.rawTotal} marks
                     </span>
@@ -243,35 +243,44 @@ function Sitting({
   const answered = paper.filter((id) => (answers[id] ?? '').trim().length > 0).length
   const low = remainingMs < 5 * 60 * 1000
 
+  // Keep the question you are on inside the scrolling navigator.
+  const currentCellRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    currentCellRef.current?.scrollIntoView({ block: 'nearest', inline: 'center' })
+  }, [index])
+
   if (!question) return null
 
   return (
     <div className="mx-auto flex h-full w-full max-w-2xl flex-col">
-      <div className="shrink-0 border-b border-line bg-surface px-4 py-2">
+      <div className="shrink-0 border-b border-rule bg-sheet px-4 py-2">
         <div className="flex items-center justify-between gap-3">
           <span className="font-mono text-sm">
             <span className={low ? 'text-critical' : ''}>{formatClock(remainingMs)}</span>
           </span>
-          <span className="font-mono text-[11px] text-faint">
+          <span className="data">
             {index + 1} of {total}, {answered} answered
           </span>
         </div>
-        <ol className="mt-2 flex flex-wrap gap-1">
+        {/* One scrolling row rather than a wrapped grid, so every cell can stay
+            at the 44px touch floor without four rows of chrome on a phone. */}
+        <ol className="-mx-1 mt-2 flex gap-1 overflow-x-auto px-1 pb-1" aria-label="Jump to a question">
           {paper.map((id, position) => {
             const done = (answers[id] ?? '').trim().length > 0
             return (
-              <li key={id}>
+              <li key={id} className="shrink-0">
                 <button
+                  ref={position === index ? currentCellRef : undefined}
                   type="button"
                   onClick={() => onGo(position)}
-                  aria-label={`Question ${position + 1}${done ? ', answered' : ''}`}
-                  aria-current={position === index}
-                  className={`size-6 rounded-sm border font-mono text-[10px] ${
+                  aria-label={`Question ${position + 1}${done ? ', answered' : ', not answered'}`}
+                  aria-current={position === index ? 'true' : undefined}
+                  className={`size-11 border font-mono text-xs ${
                     position === index
-                      ? 'border-accent bg-accent text-accent-ink'
+                      ? 'border-accent bg-accent font-semibold text-accent-ink'
                       : done
-                        ? 'border-accent/60 bg-accent-soft text-ink'
-                        : 'border-line bg-surface2 text-faint'
+                        ? 'border-rule-strong bg-accent-soft text-ink'
+                        : 'border-rule bg-raised text-faint'
                   }`}
                 >
                   {position + 1}
@@ -283,10 +292,10 @@ function Sitting({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-        <div className="font-mono text-[11px] text-faint">
+        <div className="data">
           {question.id} · {question.format} · {sectionTitle(question.section)}
         </div>
-        <div className="mt-2 border border-line bg-surface p-3">
+        <div className="mt-2 sheet p-3">
           <Markdown>{question.format === 'MCQ' ? question.stem : question.prompt}</Markdown>
         </div>
 
@@ -300,8 +309,8 @@ function Sitting({
                   <button
                     type="button"
                     onClick={() => onAnswer(question.id, letter)}
-                    className={`flex w-full items-start gap-3 rounded border p-3 text-left text-sm ${
-                      picked ? 'border-accent bg-accent-soft' : 'border-line bg-surface'
+                    className={`flex w-full items-start gap-3 rounded-sm border p-3 text-left text-sm ${
+                      picked ? 'border-accent bg-accent-soft' : 'border-rule bg-sheet'
                     }`}
                   >
                     <span className="font-mono text-xs text-muted">{letter}</span>
@@ -318,7 +327,7 @@ function Sitting({
               value={answers[question.id] ?? ''}
               onChange={(event) => onAnswer(question.id, event.target.value)}
               rows={question.format === 'scenario' ? 9 : 6}
-              className={`mt-1 w-full resize-y rounded border border-line bg-surface2 p-3 text-sm ${
+              className={`mt-1 w-full resize-y rounded-sm border border-rule bg-raised p-3 text-sm ${
                 question.format === 'SQL' || question.format === 'Python' ? 'font-mono' : ''
               }`}
               spellCheck={question.format === 'short' || question.format === 'scenario'}
@@ -329,13 +338,13 @@ function Sitting({
         )}
       </div>
 
-      <div className="shrink-0 border-t border-line bg-surface px-3 py-3">
+      <div className="shrink-0 border-t border-rule bg-sheet px-3 py-3">
         <div className="flex gap-2">
           <button
             type="button"
             onClick={() => onGo(Math.max(0, index - 1))}
             disabled={index === 0}
-            className="min-h-12 flex-1 rounded border border-line text-sm text-muted disabled:opacity-40"
+            className="min-h-12 flex-1 rounded-sm border border-rule text-sm text-muted disabled:opacity-40"
           >
             Back
           </button>
@@ -343,7 +352,7 @@ function Sitting({
             <button
               type="button"
               onClick={() => onGo(index + 1)}
-              className="min-h-12 flex-[2] rounded bg-accent text-sm font-semibold text-accent-ink"
+              className="min-h-12 flex-[2] rounded-sm bg-accent text-sm font-semibold text-accent-ink"
             >
               Next
             </button>
@@ -351,7 +360,7 @@ function Sitting({
             <button
               type="button"
               onClick={onSubmit}
-              className="min-h-12 flex-[2] rounded bg-accent text-sm font-semibold text-accent-ink"
+              className="min-h-12 flex-[2] rounded-sm bg-accent text-sm font-semibold text-accent-ink"
             >
               Submit the paper
             </button>
@@ -403,10 +412,10 @@ function Review({
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-4">
-      <h1 className="font-mono text-xs tracking-[0.14em] text-muted uppercase">Result</h1>
+      <h1 className="eyebrow">Result</h1>
       {timedOut ? <p className="mt-1 text-sm text-hard">The clock ran out. The paper was submitted as it stood.</p> : null}
 
-      <div className="mt-3 border border-line bg-surface p-4">
+      <div className="mt-3 sheet p-4">
         <div className="flex items-baseline gap-3">
           <span className="font-mono text-3xl leading-none">{Math.round(score.weightedScore)}%</span>
           <span className="text-sm text-muted">weighted by section</span>
@@ -423,7 +432,7 @@ function Review({
         ) : null}
       </div>
 
-      <h2 className="mt-5 mb-2 font-mono text-xs tracking-[0.14em] text-muted uppercase">By section</h2>
+      <h2 className="mt-5 mb-2 eyebrow">By section</h2>
       <ul className="space-y-1.5">
         {sections
           .filter((section) => blueprint[section.id] !== undefined)
@@ -431,23 +440,23 @@ function Review({
             const bucket = score.perSection[String(section.id)] ?? { correct: 0, total: 0 }
             const percent = bucket.total > 0 ? Math.round((bucket.correct / bucket.total) * 100) : 0
             return (
-              <li key={section.id} className="border border-line bg-surface p-3">
+              <li key={section.id} className="sheet p-3">
                 <div className="flex items-baseline justify-between gap-3">
                   <span className="text-sm">{section.title}</span>
                   <span className="font-mono text-xs">
                     {bucket.correct} / {bucket.total}
                   </span>
                 </div>
-                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-surface2">
-                  <div className="h-full rounded-full bg-accent" style={{ width: `${percent}%` }} />
+                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-sm bg-raised">
+                  <div className="h-full rounded-sm bg-accent" style={{ width: `${percent}%` }} />
                 </div>
-                <p className="mt-1 font-mono text-[11px] text-faint">{section.weight}% of the exam</p>
+                <p className="mt-1 data">{section.weight}% of the exam</p>
               </li>
             )
           })}
       </ul>
 
-      <h2 className="mt-5 mb-2 font-mono text-xs tracking-[0.14em] text-muted uppercase">Every question</h2>
+      <h2 className="mt-5 mb-2 eyebrow">Every question</h2>
       <ul className="space-y-2">
         {paperQuestions.map((question) => (
           <li key={question.id}>
@@ -466,14 +475,14 @@ function Review({
           type="button"
           onClick={onSave}
           disabled={saved}
-          className="min-h-14 w-full rounded bg-accent text-base font-semibold text-accent-ink disabled:opacity-50"
+          className="min-h-14 w-full rounded-sm bg-accent text-base font-semibold text-accent-ink disabled:opacity-50"
         >
           {saved ? 'Saved' : 'Save this attempt'}
         </button>
         <button
           type="button"
           onClick={onAgain}
-          className="min-h-12 w-full rounded border border-line text-sm text-muted hover:text-ink"
+          className="min-h-12 w-full rounded-sm border border-rule text-sm text-muted hover:text-ink"
         >
           Back to the mock exam
         </button>
@@ -501,12 +510,12 @@ function ReviewCard({
 }) {
   const auto = question.format === 'MCQ' && question.answerLetter !== null
   const tone =
-    result === 'correct' ? 'border-easy/60' : result === 'partial' ? 'border-medium/60' : result === 'wrong' ? 'border-missed/60' : 'border-line'
+    result === 'correct' ? 'border-easy/60' : result === 'partial' ? 'border-medium/60' : result === 'wrong' ? 'border-missed/60' : 'border-rule'
 
   return (
-    <details className={`border bg-surface ${tone}`} open={result !== 'correct'}>
+    <details className={`border bg-sheet ${tone}`} open={result !== 'correct'}>
       <summary className="cursor-pointer px-3 py-3">
-        <span className="font-mono text-[11px] text-faint">
+        <span className="data">
           {question.id} · {question.format} · section {question.section}
         </span>
         <span className="mt-1 flex items-center gap-2 text-sm font-semibold">
@@ -522,12 +531,12 @@ function ReviewCard({
         </span>
       </summary>
 
-      <div className="border-t border-line px-3 pb-3">
+      <div className="border-t border-rule px-3 pb-3">
         <div className="mt-2">
           <Markdown>{question.prompt}</Markdown>
         </div>
 
-        <p className="mt-3 font-mono text-xs tracking-wide text-muted uppercase">What you wrote</p>
+        <p className="mt-3 eyebrow">What you wrote</p>
         {auto ? (
           <p className="mt-1 text-sm">
             {answer ? `Option ${answer}` : 'No answer'}
@@ -537,7 +546,7 @@ function ReviewCard({
           <p className="mt-1 text-sm whitespace-pre-wrap">{answer.trim().length > 0 ? answer : 'No answer'}</p>
         )}
 
-        <p className="mt-3 font-mono text-xs tracking-wide text-muted uppercase">Model answer and the trap</p>
+        <p className="mt-3 eyebrow">Model answer and the trap</p>
         <Markdown className="mt-1">{question.answer}</Markdown>
 
         {question.promptCode && question.answerCode ? (
@@ -554,8 +563,8 @@ function ReviewCard({
                 type="button"
                 aria-pressed={result === mark.value}
                 onClick={() => onMark(mark.value)}
-                className={`min-h-12 rounded border px-1 text-xs font-semibold ${mark.tone} ${
-                  result === mark.value ? 'bg-surface2' : 'bg-surface'
+                className={`min-h-12 rounded-sm border px-1 text-xs font-semibold ${mark.tone} ${
+                  result === mark.value ? 'bg-raised' : 'bg-sheet'
                 }`}
               >
                 {mark.label}

@@ -76,6 +76,7 @@ worker is installed.
 ## Layout
 
 ```
+DESIGN.md          the token plan and its critique, written at stage 4
 content/source/    the four markdown files, the only source of study content
 scripts/           build-content.ts (parser), verify-core.ts, verify-sandbox.ts, make-icons.mjs
 src/lib/           storage, Leitner scheduling, session and practice queues, search
@@ -97,4 +98,5 @@ Built in the order set by the spec, one commit per stage.
    the difficulty level system.
 3. **Stage 3, done.** Mock exam with a countdown and saved attempts, explain it back,
    progress export and import, extra fact deck import, reset behind a typed confirmation.
-4. **Stage 4.** Styling pass against real content.
+4. **Stage 4, done.** Styling pass against real content. The token plan and the
+   critique behind it are in [DESIGN.md](DESIGN.md).

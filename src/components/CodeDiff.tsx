@@ -9,7 +9,7 @@ export function CodeDiff({ before, after }: { before: string; after: string }) {
   const lines = diffLines(before, after)
 
   return (
-    <div className="table-scroll bg-surface2">
+    <div className="table-scroll bg-raised">
       <pre className="min-w-full p-2 font-mono text-xs leading-relaxed">
         {lines.map((line, index) => {
           const marker = line.type === 'added' ? '+' : line.type === 'removed' ? '-' : ' '

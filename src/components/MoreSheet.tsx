@@ -43,9 +43,9 @@ export function MoreSheet({ open, onClose }: { open: boolean; onClose: () => voi
         role="dialog"
         aria-modal="true"
         aria-labelledby="more-sheet-title"
-        className="relative max-h-[85vh] w-full max-w-lg overflow-y-auto border-t border-line bg-surface pb-[env(safe-area-inset-bottom)]"
+        className="relative max-h-[85vh] w-full max-w-lg overflow-y-auto border-t border-rule bg-sheet pb-[env(safe-area-inset-bottom)]"
       >
-        <div className="flex items-center justify-between border-b border-line px-4 py-3">
+        <div className="flex items-center justify-between border-b border-rule px-4 py-3">
           <h2 id="more-sheet-title" className="text-sm font-semibold">
             More
           </h2>
@@ -54,7 +54,7 @@ export function MoreSheet({ open, onClose }: { open: boolean; onClose: () => voi
           </button>
         </div>
 
-        <section className="border-b border-line p-3">
+        <section className="border-b border-rule p-3">
           <h3 className="px-1 text-xs font-semibold tracking-wide text-muted uppercase">Difficulty</h3>
           <ul className="mt-2 space-y-1">
             {LEVELS.map((level) => {
@@ -69,8 +69,8 @@ export function MoreSheet({ open, onClose }: { open: boolean; onClose: () => voi
                       dispatch({ type: 'set-level', level: level.value })
                       onClose()
                     }}
-                    className={`flex w-full flex-col gap-1 rounded border p-3 text-left ${
-                      active ? 'border-accent bg-accent-soft' : 'border-transparent hover:bg-surface2'
+                    className={`flex w-full flex-col gap-1 rounded-sm border p-3 text-left ${
+                      active ? 'border-accent bg-accent-soft' : 'border-transparent hover:bg-raised'
                     }`}
                   >
                     <span className="flex items-center gap-2 text-sm font-semibold">
@@ -98,7 +98,7 @@ export function MoreSheet({ open, onClose }: { open: boolean; onClose: () => voi
                 <Link
                   to={destination.to}
                   onClick={onClose}
-                  className="flex min-h-14 flex-col justify-center rounded px-3 hover:bg-surface2"
+                  className="flex min-h-14 flex-col justify-center rounded-sm px-3 hover:bg-raised"
                 >
                   <span className="text-sm font-semibold">{destination.label}</span>
                   <span className="text-xs text-muted">{destination.detail}</span>

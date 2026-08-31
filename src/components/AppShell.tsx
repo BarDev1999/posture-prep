@@ -7,15 +7,19 @@ import { todayISO } from '../lib/date.ts'
 import { useSettings } from '../state/AppContext.tsx'
 
 /**
- * The frame: a thin header rule, one scrolling region, and a bottom bar that
- * keeps navigation and the difficulty control under the thumb on every screen.
+ * The frame: a ruled header, one scrolling region, and a bottom bar that keeps
+ * navigation and the difficulty control under the thumb on every screen.
+ *
+ * The active tab is marked by a rule across its top and by ink weight, not by
+ * colour alone. The accent is left to mean one thing, cleared, and spending it
+ * on navigation would dilute that.
  */
 
 const navItemClass =
-  'flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 px-0.5 text-[11px] leading-tight'
+  'relative flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 border-t-2 border-transparent px-0.5 text-[11px] leading-tight'
 
 function tabClass({ isActive }: { isActive: boolean }) {
-  return `${navItemClass} ${isActive ? 'text-accent' : 'text-muted hover:text-ink'}`
+  return `${navItemClass} ${isActive ? 'border-t-accent bg-raised font-semibold text-ink' : 'text-muted hover:text-ink'}`
 }
 
 export function AppShell() {
@@ -30,13 +34,14 @@ export function AppShell() {
 
   return (
     <div className="flex h-dvh flex-col bg-ground text-ink">
-      <header className="flex shrink-0 items-center justify-between gap-3 border-b border-line bg-surface px-4 py-2">
-        <Link to="/" className="font-mono text-xs tracking-[0.14em] text-muted uppercase">
+      <header className="flex shrink-0 items-center justify-between gap-3 border-b border-rule bg-sheet px-4 py-2">
+        <Link to="/" className="eyebrow hover:text-ink">
           Posture prep
         </Link>
         <Link
           to="/settings"
-          className="rounded border border-line px-2 py-1 font-mono text-xs text-muted hover:text-ink"
+          className={`tag ${daysLeft <= 1 ? 'border-high/70 text-high' : ''} hover:text-ink`}
+          aria-label={`${daysLabel}. Open settings to change the exam date`}
         >
           {daysLabel}
         </Link>
@@ -48,22 +53,22 @@ export function AppShell() {
 
       <nav
         aria-label="Main"
-        className="flex shrink-0 items-stretch border-t border-line bg-surface pb-[env(safe-area-inset-bottom)]"
+        className="flex shrink-0 items-stretch border-t border-rule bg-sheet pb-[env(safe-area-inset-bottom)]"
       >
         <NavLink to="/" end className={tabClass}>
-          <span className="font-medium">Home</span>
+          <span>Home</span>
           <span className="text-faint">progress</span>
         </NavLink>
         <NavLink to="/drill" className={tabClass}>
-          <span className="font-medium">Drill</span>
+          <span>Drill</span>
           <span className="text-faint">facts</span>
         </NavLink>
         <NavLink to="/practice" className={tabClass}>
-          <span className="font-medium">Practice</span>
+          <span>Practice</span>
           <span className="text-faint">questions</span>
         </NavLink>
         <NavLink to="/sandbox" className={tabClass}>
-          <span className="font-medium">Sandbox</span>
+          <span>Sandbox</span>
           <span className="text-faint">queries</span>
         </NavLink>
         <button
@@ -73,7 +78,7 @@ export function AppShell() {
           aria-expanded={moreOpen}
           className={`${navItemClass} text-muted hover:text-ink`}
         >
-          <span className="font-medium">More</span>
+          <span>More</span>
           <span className="text-faint">{level.name}</span>
         </button>
       </nav>
