@@ -24,7 +24,7 @@ import type { Difficulty } from './content.ts'
 export type TopicId = 'sql' | 'python' | 'ai-security' | 'cloud' | 'linux-web-containers' | 'identity'
 
 /** Which syntax a code block is in. Drives the comment marker and indentation. */
-export type Language = 'sql' | 'python' | 'yaml' | 'json' | 'text'
+export type Language = 'sql' | 'python' | 'javascript' | 'yaml' | 'json' | 'text'
 
 // ------------------------------------------------------------------ step 1
 
@@ -387,6 +387,7 @@ export const STEP_TITLES: Record<StepKey, string> = {
 export const COMMENT_MARKER: Record<Language, string> = {
   sql: '--',
   python: '#',
+  javascript: '//',
   yaml: '#',
   json: '//',
   text: '--',

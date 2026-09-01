@@ -286,6 +286,17 @@ export const MISCONCEPTIONS: Misconception[] = [
     topics: ['linux-web-containers'],
     kind: 'trap',
   },
+  // ---------------------------------------- derived from files A to D, SQL
+  {
+    id: 'sql-limit-per-group',
+    name: 'LIMIT can be applied per group',
+    belief: 'GROUP BY makes the groups, so LIMIT 3 takes three rows from each of them.',
+    category: 'wrong-mental-model',
+    topics: ['sql'],
+    kind: 'derived',
+    source: 'Q1.19',
+  },
+
   // ------------------------------------- derived from files A to D, Python
   {
     id: 'py-class-attribute-shared',

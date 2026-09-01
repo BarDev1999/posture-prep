@@ -13,6 +13,7 @@ import { lesson as lesson11 } from './lesson-11.ts'
 import { lesson as lesson12 } from './lesson-12.ts'
 import { lesson as lesson13 } from './lesson-13.ts'
 import { lesson as lesson14 } from './lesson-14.ts'
+import { lesson as lesson14x } from './lesson-14x.ts'
 
 /**
  * The SQL topic bundle. This module is only ever reached through a dynamic
@@ -34,4 +35,5 @@ export const lessons: Lesson[] = [
   lesson12,
   lesson13,
   lesson14,
+  lesson14x,
 ]
