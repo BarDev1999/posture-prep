@@ -255,7 +255,7 @@ function LessonPlayer({ lessonId }: { lessonId: string }) {
         </p>
       ) : null}
 
-      <StepIndicator step={step} visible={visible} skipped={skipped} />
+      <StepIndicator step={step} visible={visible} skipped={skipped} onJump={setStep} />
 
       <div className="mt-4">
         {stepKey === 'vocabulary' ? <VocabularyStep terms={lesson.steps.vocabulary} /> : null}
@@ -445,14 +445,23 @@ function whyBlocked(stepKey: string, promptsLeft: number): string {
 
 // ------------------------------------------------------------------ chrome
 
+/**
+ * The nine steps as a rule of segments, and a way back into any of them.
+ *
+ * Forward stays gated: a step is reachable once it has been reached. Backward
+ * is not, and a learner who wants to reread the mental model in the middle of
+ * the trap should not have to press Back six times to get there.
+ */
 function StepIndicator({
   step,
   visible,
   skipped,
+  onJump,
 }: {
   step: number
   visible: Set<StepKey>
   skipped: StepKey[]
+  onJump: (step: number) => void
 }) {
   const key = stepKeyAt(step)
   const shownCount = STEP_KEYS.filter((candidate) => visible.has(candidate)).length
@@ -469,22 +478,36 @@ function StepIndicator({
         {STEP_KEYS.map((candidate, index) => {
           const hidden = !visible.has(candidate)
           const wasSkipped = skipped.includes(candidate)
+          const passed = index + 1 < step
+          const bar = `h-1.5 w-full ${
+            hidden
+              ? 'bg-rule opacity-30'
+              : wasSkipped
+                ? 'bg-rule-strong opacity-60'
+                : passed
+                  ? 'bg-accent'
+                  : index + 1 === step
+                    ? 'bg-rule-strong'
+                    : 'bg-rule'
+          }`
           return (
-            <li
-              key={candidate}
-              title={STEP_TITLES[candidate]}
-              className={`h-1.5 flex-1 ${
-                hidden
-                  ? 'bg-rule opacity-30'
-                  : wasSkipped
-                    ? 'bg-rule-strong opacity-60'
-                    : index + 1 < step
-                      ? 'bg-accent'
-                      : index + 1 === step
-                        ? 'bg-rule-strong'
-                        : 'bg-rule'
-              }`}
-            />
+            <li key={candidate} className="flex-1">
+              {passed && !hidden ? (
+                <button
+                  type="button"
+                  onClick={() => onJump(index + 1)}
+                  className="flex h-6 w-full items-center"
+                  title={`Back to ${STEP_TITLES[candidate].toLowerCase()}`}
+                  aria-label={`Back to step ${index + 1}, ${STEP_TITLES[candidate]}`}
+                >
+                  <span className={bar} />
+                </button>
+              ) : (
+                <span className="flex h-6 items-center" title={STEP_TITLES[candidate]}>
+                  <span className={bar} />
+                </span>
+              )}
+            </li>
           )
         })}
       </ol>
