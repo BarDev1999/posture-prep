@@ -1,6 +1,7 @@
-import { CURRICULUM, curriculumEntry } from '../data/curriculum.ts'
+import { CURRICULUM, TOPICS, curriculumEntry } from '../data/curriculum.ts'
 import type { CurriculumEntry } from '../data/curriculum.ts'
 import { hasLesson } from '../data/lessons/index.ts'
+import { getMisconception } from '../data/misconceptions.ts'
 import type {
   FadeExercise,
   ParsonsBlock,
@@ -8,9 +9,16 @@ import type {
   ProduceExercise,
   RuleRow,
   StepKey,
+  TopicId,
 } from '../types/lesson.ts'
 import { STEP_KEYS } from '../types/lesson.ts'
-import type { GuidanceTier, Level, LessonProgress, TopicProgress } from '../types/progress.ts'
+import type {
+  GuidanceTier,
+  Level,
+  LessonProgress,
+  MisconceptionProgress,
+  TopicProgress,
+} from '../types/progress.ts'
 
 /**
  * The rules of the Learn module, kept pure so the verifier can exercise them
@@ -324,6 +332,142 @@ export function stepsForTier(tier: GuidanceTier): StepKey[] {
 /** Two consecutive unaided step 7 completions in a topic. */
 export function isFluent(topic: TopicProgress): boolean {
   return topic.fluencyStreak >= 2
+}
+
+// ------------------------------------------------ blocked to interleaved
+
+/**
+ * The hybrid schedule the second brief asks for, and the correction it makes to
+ * the first one.
+ *
+ * Interleaving beats blocked practice for long term retention, but only above a
+ * threshold of prior knowledge; below it the switching cost eats the working
+ * memory needed to build the schema at all. So practice is blocked while the
+ * learner is inside a topic, and a topic's items join the interleaved pool once
+ * that topic is finished.
+ *
+ * This is a recommendation and not a lock. It decides what one button on the
+ * home screen does, it says so in one line, and practising everything is always
+ * one tap away: gating the practice module behind the Learn module would punish
+ * the parts of the exam the learner already knows.
+ */
+export type ScheduleMode = 'open' | 'blocked' | 'interleaved'
+
+export type SchedulePlan = {
+  mode: ScheduleMode
+  /** Exam sections whose Learn topics are all finished. Empty until one is. */
+  sections: number[]
+  /** The topic the learner is currently inside, if any. */
+  activeTopic: TopicId | null
+  /** The section that topic belongs to, for a blocked session. */
+  activeSection: number | null
+  note: string
+}
+
+/** The topic holding the first lesson that is started but not finished. */
+export function activeTopic(lessons: Record<string, LessonProgress>): TopicId | null {
+  const started = CURRICULUM.find((entry) => lessonProgress(lessons, entry.id).status === 'in-progress')
+  if (started) return started.topicId
+  return null
+}
+
+/** Exam sections where every topic is finished, however it was finished. */
+export function studiedSections(lessons: Record<string, LessonProgress>): number[] {
+  const sections = new Set<number>()
+  for (const topic of TOPICS) {
+    const entries = CURRICULUM.filter((entry) => entry.topicId === topic.id)
+    const done = entries.every((entry) => isFinished(lessonState(entry, lessons)))
+    if (done) sections.add(topic.sectionId)
+  }
+  // A section can hold two topics, as section 1 does. Both have to be finished.
+  return [...sections]
+    .filter((sectionId) =>
+      TOPICS.filter((topic) => topic.sectionId === sectionId).every((topic) =>
+        CURRICULUM.filter((entry) => entry.topicId === topic.id).every((entry) =>
+          isFinished(lessonState(entry, lessons)),
+        ),
+      ),
+    )
+    .sort((a, b) => a - b)
+}
+
+export function schedulePlan(lessons: Record<string, LessonProgress>): SchedulePlan {
+  const sections = studiedSections(lessons)
+  const active = activeTopic(lessons)
+  const activeSection = active ? (TOPICS.find((topic) => topic.id === active)?.sectionId ?? null) : null
+
+  if (sections.length > 0) {
+    return {
+      mode: 'interleaved',
+      sections,
+      activeTopic: active,
+      activeSection,
+      note:
+        sections.length === 1
+          ? 'Section ' + sections[0] + ' is finished in Learn, so today mixes its material only. Other sections join as you finish them.'
+          : 'Sections ' + sections.join(' and ') + ' are finished in Learn, so today interleaves across them.',
+    }
+  }
+
+  if (active !== null) {
+    return {
+      mode: 'blocked',
+      sections: [],
+      activeTopic: active,
+      activeSection,
+      note: 'You are partway through a topic, so today stays blocked to it: same material, repeated, until the topic is finished.',
+    }
+  }
+
+  return {
+    mode: 'open',
+    sections: [],
+    activeTopic: null,
+    activeSection: null,
+    note: 'No Learn topic finished yet, so the session draws on everything. Finish a topic and it starts interleaving what you have studied.',
+  }
+}
+
+// ----------------------------------------------------------------- weak spots
+
+/**
+ * A misconception the learner has fallen for twice and not yet cleared.
+ *
+ * Twice is the threshold from the brief, and it is the right one: once is a
+ * wrong answer, twice is a belief. Getting a later trap on the same
+ * misconception right clears it, which is what makes this a weak spot list
+ * rather than a permanent record of mistakes.
+ */
+export type WeakSpot = {
+  id: string
+  name: string
+  belief: string
+  fellFor: number
+  lastFellAt: string | null
+}
+
+export function weakSpots(misconceptions: Record<string, MisconceptionProgress>): WeakSpot[] {
+  const out: WeakSpot[] = []
+  for (const [id, progress] of Object.entries(misconceptions)) {
+    if (progress.fellFor < 2 || progress.clearedAt !== null) continue
+    const entry = getMisconception(id)
+    if (!entry) continue
+    out.push({
+      id,
+      name: entry.name,
+      belief: entry.belief,
+      fellFor: progress.fellFor,
+      lastFellAt: progress.lastFellAt,
+    })
+  }
+  return out.sort((a, b) => b.fellFor - a.fellFor || a.name.localeCompare(b.name))
+}
+
+/** Lessons whose step 8 tests a misconception the learner keeps falling for. */
+export function lessonsForWeakSpot(id: string): CurriculumEntry[] {
+  const entry = getMisconception(id)
+  if (!entry) return []
+  return CURRICULUM.filter((candidate) => entry.topics.includes(candidate.topicId))
 }
 
 // ---------------------------------------------------------------- step titles

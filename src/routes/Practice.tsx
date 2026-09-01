@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { Markdown } from '../components/Markdown.tsx'
 import { CodeDiff } from '../components/CodeDiff.tsx'
 import { curriculumEntry } from '../data/curriculum.ts'
+import { schedulePlan } from '../lib/learn.ts'
 import { articleById, questions, sections } from '../lib/content.ts'
 import { todayISO } from '../lib/date.ts'
 import { buildPracticeQueue, reduceOptions, reviewQueueSize } from '../lib/practice.ts'
@@ -39,6 +40,14 @@ export function Practice() {
   const [search, setSearch] = useSearchParams()
   const lesson = curriculumEntry(search.get('lesson') ?? '')
 
+  // The interleaved half of the same schedule, arriving as ?mix=studied: the
+  // sections whose Learn topics are finished, mixed together. It filters the
+  // pool and never hides a section from the picker.
+  const plan = useMemo(() => schedulePlan(progress.lessons), [progress.lessons])
+  const mixStudied = search.get('mix') === 'studied' && !lesson
+  const mixSections = mixStudied && plan.mode === 'interleaved' ? plan.sections : null
+  const blockedSection = mixStudied && plan.mode === 'blocked' ? plan.activeSection : null
+
   const [filters, setFilters] = useState<PracticeFilters>({ sectionId: null, formats: null })
   const [queue, setQueue] = useState<string[]>([])
   const [index, setIndex] = useState(0)
@@ -54,7 +63,7 @@ export function Practice() {
     progressRef.current = progress.questions
   })
 
-  const filterKey = `${filters.sectionId}|${filters.formats?.join(',') ?? 'all'}|${level}|${lesson?.id ?? ''}`
+  const filterKey = `${filters.sectionId}|${filters.formats?.join(',') ?? 'all'}|${level}|${lesson?.id ?? ''}|${mixSections?.join(',') ?? ''}|${blockedSection ?? ''}`
   useEffect(() => {
     // "All" means everything except queries, which are answered in the sandbox
     // where they can actually run. Picking the SQL chip still brings them here.
@@ -62,6 +71,8 @@ export function Practice() {
       ? { sectionId: null, formats: null, questionIds: lesson.practice.questionIds }
       : {
           ...filters,
+          sectionId: filters.sectionId ?? blockedSection,
+          sections: mixSections,
           formats: filters.formats ?? ['MCQ', 'short', 'scenario', 'Python'],
         }
     const built = buildPracticeQueue(questions, progressRef.current, level, effective, today)
@@ -132,6 +143,20 @@ export function Practice() {
             {lesson.practice.questionIds.length === 1 ? '' : 's'} tagged to lesson {lesson.number}, {lesson.title}.
             Nothing else is mixed in until the topic is finished.
           </p>
+          <button
+            type="button"
+            onClick={() => setSearch({})}
+            className="mt-2 min-h-11 w-full rounded-sm border border-rule text-sm text-muted hover:text-ink"
+          >
+            Practise everything instead
+          </button>
+        </div>
+      ) : null}
+
+      {mixStudied && !lesson && (mixSections !== null || blockedSection !== null) ? (
+        <div className="mb-3 border-l-2 border-accent bg-sheet p-3">
+          <p className="eyebrow">{mixSections ? 'Interleaved' : 'Blocked'}</p>
+          <p className="mt-1 text-sm leading-relaxed">{plan.note}</p>
           <button
             type="button"
             onClick={() => setSearch({})}

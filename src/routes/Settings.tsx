@@ -76,6 +76,35 @@ export function Settings() {
       </section>
 
       <section className="mt-4 sheet p-4">
+        <h2 className="text-sm font-semibold">Lesson order</h2>
+        <p className="mt-1 text-xs leading-relaxed text-muted">
+          Off, every lesson is open and the prerequisites on the topic map are advice: skip what you already know. On,
+          a lesson waits until the ones it depends on are finished, which is the original design and the right one if
+          you are walking the curriculum from lesson one.
+        </p>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {[
+            { value: false, label: 'Everything open' },
+            { value: true, label: 'Guided order' },
+          ].map((option) => (
+            <button
+              key={String(option.value)}
+              type="button"
+              aria-pressed={progress.settings.guidedOrder === option.value}
+              onClick={() => dispatch({ type: 'set-guided-order', value: option.value })}
+              className={`min-h-12 rounded-sm border px-2 text-xs font-semibold ${
+                progress.settings.guidedOrder === option.value
+                  ? 'border-accent bg-accent-soft text-ink'
+                  : 'border-rule bg-raised text-muted hover:text-ink'
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="mt-4 sheet p-4">
         <h2 className="text-sm font-semibold">Appearance</h2>
         <p className="mt-1 text-xs text-muted">System follows the phone setting.</p>
         <div className="mt-3 grid grid-cols-3 gap-2">

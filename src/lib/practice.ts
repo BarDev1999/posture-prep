@@ -17,6 +17,8 @@ import type { Level, QuestionProgress } from '../types/progress.ts'
 
 export type PracticeFilters = {
   sectionId: number | null
+  /** Sections to interleave across, from the hybrid schedule. null means all. */
+  sections?: number[] | null
   formats: QuestionFormat[] | null
   /**
    * An explicit set of question ids, used by a lesson handoff. This is blocked
@@ -105,6 +107,7 @@ export function buildPracticeQueue(
     // are not applied to them: the lesson decided they were the right ones.
     if (wanted) return wanted.has(question.id)
     if (filters.sectionId !== null && question.section !== filters.sectionId) return false
+    if (filters.sections && filters.sections.length > 0 && !filters.sections.includes(question.section)) return false
     if (filters.formats && !filters.formats.includes(question.format)) return false
     return allowsQuestion(question, level, progress, questions)
   })

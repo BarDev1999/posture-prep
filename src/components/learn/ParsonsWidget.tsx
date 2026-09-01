@@ -78,7 +78,7 @@ export function ParsonsWidget({ exercise, level, solved, onSolved }: Props) {
     // A new block starts at the indentation of the one above it, which is right
     // far more often than zero is and saves a tap on every body line.
     const above = next[index - 1]
-    setIndents({ ...indents, [selected]: above ? (indents[above] ?? 0) : 0 })
+    setIndents((current) => ({ ...current, [selected]: above ? (current[above] ?? 0) : 0 }))
     setSelected(null)
     clearMarks()
   }
@@ -98,8 +98,10 @@ export function ParsonsWidget({ exercise, level, solved, onSolved }: Props) {
   }
 
   const shift = (blockId: string, by: number) => {
-    const current = indents[blockId] ?? 0
-    setIndents({ ...indents, [blockId]: Math.max(0, Math.min(MAX_INDENT, current + by)) })
+    setIndents((current) => ({
+      ...current,
+      [blockId]: Math.max(0, Math.min(MAX_INDENT, (current[blockId] ?? 0) + by)),
+    }))
     clearMarks()
   }
 

@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { ruleRowCorrect } from '../../lib/learn.ts'
+import { seededOrder } from '../../lib/shuffle.ts'
 import { RULE_PART_QUESTIONS, RULE_PART_TITLES } from '../../types/lesson.ts'
 import type { RuleRow } from '../../types/lesson.ts'
 
@@ -26,6 +27,14 @@ export function RuleBuilder({
   const [choices, setChoices] = useState<Record<string, string>>({})
   const [graded, setGraded] = useState(false)
 
+  // Authored with the right answer first, shown in an order that owes nothing
+  // to how it was written. Seeded per row, so it is the same tomorrow.
+  const optionsByPart = useMemo(() => {
+    const out: Record<string, string[]> = {}
+    for (const row of rows) out[row.part] = seededOrder(row.options, `${rows.length}:${row.part}:${row.answer}`)
+    return out
+  }, [rows])
+
   const answeredAll = rows.every((row) => choices[row.part] !== undefined)
   const wrongRows = rows.filter((row) => !ruleRowCorrect(row, choices[row.part]))
 
@@ -48,7 +57,7 @@ export function RuleBuilder({
             <p className="mt-0.5 text-sm font-semibold">{RULE_PART_QUESTIONS[row.part]}</p>
 
             <ul className="mt-2 space-y-1.5">
-              {row.options.map((option) => {
+              {(optionsByPart[row.part] ?? row.options).map((option) => {
                 const picked = chosen === option
                 const marked = showResult && (picked || option === row.answer)
                 return (
@@ -58,7 +67,10 @@ export function RuleBuilder({
                       disabled={done}
                       aria-pressed={picked}
                       onClick={() => {
-                        setChoices({ ...choices, [row.part]: option })
+                        // Functional form on purpose: two selections inside one
+                        // batch would otherwise both spread the same stale
+                        // object and the first would be lost.
+                        setChoices((current) => ({ ...current, [row.part]: option }))
                         setGraded(false)
                       }}
                       className={`w-full rounded-sm border p-2.5 text-left text-sm leading-relaxed disabled:cursor-default ${

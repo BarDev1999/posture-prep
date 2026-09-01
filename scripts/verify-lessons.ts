@@ -44,6 +44,7 @@ import {
   templateSegments,
   visibleBlocks,
 } from '../src/lib/learn.ts'
+import { seededIndexes, seededOrder } from '../src/lib/shuffle.ts'
 import { schemaStatements } from '../src/lib/sql/schema.ts'
 import { seedStatements } from '../src/lib/sql/seed.ts'
 import { todayISO } from '../src/lib/date.ts'
@@ -794,6 +795,75 @@ check(
 check(
   'the last frame prints something, or the conclusion explains what it left behind',
   traces.every(({ trace }) => trace.frames.some((frame) => frame.output !== undefined) || trace.conclusion.length > 60),
+)
+
+// --------------------------------------------------------------- shuffling
+
+section('Option order')
+
+check(
+  'a seeded order keeps every item exactly once',
+  LESSONS.every((lesson) => {
+    const shown = seededOrder(lesson.steps.trap.options, lesson.steps.trap.question)
+    return (
+      shown.length === lesson.steps.trap.options.length &&
+      lesson.steps.trap.options.every((option) => shown.includes(option))
+    )
+  }),
+)
+check(
+  'and it is stable: the same seed twice gives the same order',
+  LESSONS.every((lesson) => {
+    const once = seededOrder(lesson.steps.trap.options, lesson.steps.trap.question)
+    const twice = seededOrder(lesson.steps.trap.options, lesson.steps.trap.question)
+    return once.every((option, index) => option === twice[index])
+  }),
+)
+
+/** Where the right answer lands once the widget has reordered the list. */
+const trapPositions = LESSONS.map((lesson) =>
+  seededIndexes(lesson.steps.trap.options.length, lesson.steps.trap.question).findIndex(
+    (index) => lesson.steps.trap.options[index]?.correct === true,
+  ),
+)
+check(
+  'the right answer to a trap is not always in the same place',
+  new Set(trapPositions).size >= 3,
+  `positions used: ${[...new Set(trapPositions)].sort().join(', ')}`,
+)
+check('and it is first in fewer than half of them', trapPositions.filter((position) => position === 0).length < LESSONS.length / 2)
+
+const rulePositions = ruleProduce.flatMap(({ produce }) =>
+  produce.rows.map((row) =>
+    seededOrder(row.options, `${produce.rows.length}:${row.part}:${row.answer}`).indexOf(row.answer),
+  ),
+)
+check(
+  'the right answer to a rule row moves too',
+  rulePositions.length > 0 && new Set(rulePositions).size >= 3,
+  `positions used: ${[...new Set(rulePositions)].sort().join(', ')}`,
+)
+check(
+  'and it is first in fewer than half of the rows',
+  rulePositions.filter((position) => position === 0).length < rulePositions.length / 2,
+)
+
+const choicePositions = LESSONS.flatMap((lesson) =>
+  [lesson.steps.fadeLight, lesson.steps.fadeHeavy].flatMap((fade) =>
+    fade.steps
+      .filter((step) => step.choices !== undefined)
+      .map((step) => seededOrder(step.choices as string[], `${fade.task}:${step.label}`).indexOf(step.code)),
+  ),
+)
+check(
+  'and so does the right answer to a blanked rule row',
+  choicePositions.length > 0 && new Set(choicePositions).size >= 3,
+  `positions used: ${[...new Set(choicePositions)].sort().join(', ')}`,
+)
+check(
+  'the prediction answer is not always first either',
+  traces.filter(({ trace }) => seededOrder(trace.predict.options, trace.predict.question)[0]?.correct === true).length <
+    traces.length / 2,
 )
 
 // ------------------------------------------------------------------ the SQL

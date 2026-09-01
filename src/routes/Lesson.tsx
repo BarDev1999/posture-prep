@@ -25,6 +25,7 @@ import {
   stepsForTier,
   topicProgress,
 } from '../lib/learn.ts'
+import { seededIndexes, seededOrder } from '../lib/shuffle.ts'
 import { grade, gradeError, orderMatters } from '../lib/sql/grade.ts'
 import type { GradeResult } from '../lib/sql/grade.ts'
 import type { QueryResult } from '../lib/sql/types.ts'
@@ -686,14 +687,14 @@ function FadeStepView({
               ) : step.choices ? (
                 <div className="mt-2">
                   <ul className="space-y-1.5">
-                    {step.choices.map((choice) => {
+                    {seededOrder(step.choices, `${exercise.task}:${step.label}`).map((choice) => {
                       const picked = (answers[index] ?? '') === choice
                       return (
                         <li key={choice}>
                           <button
                             type="button"
                             aria-pressed={picked}
-                            onClick={() => setAnswers({ ...answers, [index]: choice })}
+                            onClick={() => setAnswers((current) => ({ ...current, [index]: choice }))}
                             className={`w-full rounded-sm border p-2.5 text-left text-sm leading-relaxed ${
                               picked
                                 ? 'border-accent bg-accent-soft'
@@ -720,7 +721,7 @@ function FadeStepView({
                     <span className="sr-only">Write step {index + 1}</span>
                     <textarea
                       value={answers[index] ?? ''}
-                      onChange={(event) => setAnswers({ ...answers, [index]: event.target.value })}
+                      onChange={(event) => setAnswers((current) => ({ ...current, [index]: event.target.value }))}
                       rows={2}
                       spellCheck={false}
                       autoCapitalize="off"
@@ -911,6 +912,9 @@ function TrapStep({
   const misconception = getMisconception(trap.misconceptionId)
   const answered = picked !== null
   const gotIt = answered && trap.options[picked]?.correct === true
+  // Authored with the right answer wherever it fell as the question was
+  // written. Shown in a seeded order, so position teaches nothing.
+  const order = useMemo(() => seededIndexes(trap.options.length, trap.question), [trap.options.length, trap.question])
 
   return (
     <section className="mt-4">
@@ -923,7 +927,9 @@ function TrapStep({
 
       <p className="mt-3 text-sm font-semibold">{trap.question}</p>
       <ul className="mt-2 space-y-2">
-        {trap.options.map((option, index) => {
+        {order.map((index) => {
+          const option = trap.options[index]
+          if (!option) return null
           const show = answered && (index === picked || option.correct)
           return (
             <li key={option.text}>

@@ -3,6 +3,7 @@ import type { PointerEvent as ReactPointerEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Markdown } from '../components/Markdown.tsx'
 import { curriculumEntry } from '../data/curriculum.ts'
+import { schedulePlan } from '../lib/learn.ts'
 import { sections } from '../lib/content.ts'
 import { mergeDeck } from '../lib/deck.ts'
 import { todayISO } from '../lib/date.ts'
@@ -46,6 +47,16 @@ export function Drill() {
   const lesson = curriculumEntry(search.get('lesson') ?? '')
   const lessonFactIds = lesson?.practice.factIds ?? null
 
+  // The hybrid schedule, arriving as ?mix=studied from the home screen. Blocked
+  // to the topic the learner is inside, or interleaved across the sections whose
+  // Learn topics are finished. Nothing is hidden: this is the daily session
+  // filter, and every section is still one tap away from the picker below.
+  const plan = useMemo(() => schedulePlan(progress.lessons), [progress.lessons])
+  const mixStudied = search.get('mix') === 'studied' && lessonFactIds === null
+  const mixSections = mixStudied && plan.mode === 'interleaved' ? plan.sections : null
+  const blockedSection = mixStudied && plan.mode === 'blocked' ? plan.activeSection : null
+  const effectiveSection = blockedSection ?? sectionFilter
+
   const [queue, setQueue] = useState<string[]>([])
   const [index, setIndex] = useState(0)
   const [revealed, setRevealed] = useState(false)
@@ -64,7 +75,7 @@ export function Drill() {
     const built = buildDrillQueue(
       facts,
       factProgressRef.current,
-      { sectionId: sectionFilter, priorityOnly, factIds: lessonFactIds },
+      { sectionId: effectiveSection, sections: mixSections, priorityOnly, factIds: lessonFactIds },
       today,
       // A lesson's fact set is tiny, so it is always served in full rather than
       // filtered down to the cards that happen to be due today.
@@ -76,13 +87,18 @@ export function Drill() {
     setDragX(0)
     // mergeDeck returns a stable reference, so listing the deck here rebuilds
     // the queue when facts are imported without looping on every render.
-  }, [facts, sectionFilter, priorityOnly, today, drillAhead, lessonFactIds])
+  }, [facts, effectiveSection, mixSections, priorityOnly, today, drillAhead, lessonFactIds])
 
   // Live counters read current progress, so "due today" falls as cards are rated.
   const live = useMemo(
     () =>
-      buildDrillQueue(facts, progress.facts, { sectionId: sectionFilter, priorityOnly, factIds: lessonFactIds }, today),
-    [facts, progress.facts, sectionFilter, priorityOnly, today, lessonFactIds],
+      buildDrillQueue(
+        facts,
+        progress.facts,
+        { sectionId: effectiveSection, sections: mixSections, priorityOnly, factIds: lessonFactIds },
+        today,
+      ),
+    [facts, progress.facts, effectiveSection, mixSections, priorityOnly, today, lessonFactIds],
   )
 
   const cardStartedAt = useRef(Date.now())
@@ -192,6 +208,20 @@ export function Drill() {
             The {lesson.practice.factIds.length} fact{lesson.practice.factIds.length === 1 ? '' : 's'} tagged to lesson{' '}
             {lesson.number}, {lesson.title}.
           </p>
+          <button
+            type="button"
+            onClick={() => setSearch({})}
+            className="mt-2 min-h-11 w-full rounded-sm border border-rule text-sm text-muted hover:text-ink"
+          >
+            Drill everything instead
+          </button>
+        </div>
+      ) : null}
+
+      {mixStudied && !lesson && (mixSections !== null || blockedSection !== null) ? (
+        <div className="shrink-0 border-b border-rule bg-sheet px-4 py-2">
+          <p className="eyebrow">{mixSections ? 'Interleaved' : 'Blocked'}</p>
+          <p className="mt-1 text-sm leading-relaxed">{plan.note}</p>
           <button
             type="button"
             onClick={() => setSearch({})}

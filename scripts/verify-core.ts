@@ -43,10 +43,18 @@ import {
   reviewQueueSize,
   sectionMediumCleared,
 } from '../src/lib/practice.ts'
+import { schedulePlan, studiedSections, weakSpots } from '../src/lib/learn.ts'
+import { CURRICULUM } from '../src/data/curriculum.ts'
 import { search } from '../src/lib/search.ts'
 import { changedLineCount, diffLines } from '../src/lib/diff.ts'
 import type { ContentBundle, Fact } from '../src/types/content.ts'
-import type { FactProgress, ProgressState, QuestionProgress, QuestionResult } from '../src/types/progress.ts'
+import type {
+  FactProgress,
+  LessonProgress,
+  ProgressState,
+  QuestionProgress,
+  QuestionResult,
+} from '../src/types/progress.ts'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const SOURCE_DIR = resolve(ROOT, 'content', 'source')
@@ -692,6 +700,94 @@ check(
     ?.answer !== 'CAP_SYS_ADMIN',
 )
 check('a one word answer yields no blank', makeCloze('Question?', 'Yes.') === null)
+
+// ------------------------------------------------ the hybrid schedule
+
+section('Blocked to interleaved')
+
+const noLessons: Record<string, LessonProgress> = {}
+const openPlan = schedulePlan(noLessons)
+check('with nothing started the session draws on everything', openPlan.mode === 'open' && openPlan.sections.length === 0)
+
+const walked = (extra: Partial<LessonProgress> = {}): LessonProgress => ({
+  status: 'complete',
+  currentStep: 9,
+  produceAttempts: 1,
+  aided: false,
+  passedUnaided: true,
+  skipped: false,
+  completedAt: '2026-09-01',
+  ...extra,
+})
+
+const midTopic: Record<string, LessonProgress> = {
+  L3: {
+    status: 'in-progress',
+    currentStep: 4,
+    produceAttempts: 0,
+    aided: false,
+    passedUnaided: false,
+    skipped: false,
+    completedAt: null,
+  },
+}
+const blockedPlan = schedulePlan(midTopic)
+check('partway through a topic the session is blocked to it', blockedPlan.mode === 'blocked' && blockedPlan.activeTopic === 'sql')
+check('and it names the section that topic belongs to', blockedPlan.activeSection === 1)
+
+const finished = (ids: string[]): Record<string, LessonProgress> => {
+  const out: Record<string, LessonProgress> = {}
+  for (const id of ids) out[id] = walked()
+  return out
+}
+
+// Section 1 holds two topics, SQL and Python, so both have to be finished
+// before section 1 joins the interleaved pool.
+const sqlOnly = finished(CURRICULUM.filter((entry) => entry.topicId === 'sql').map((entry) => entry.id))
+check('finishing one topic of a two topic section does not open that section', studiedSections(sqlOnly).length === 0)
+
+const sectionOne = finished(
+  CURRICULUM.filter((entry) => entry.topicId === 'sql' || entry.topicId === 'python').map((entry) => entry.id),
+)
+check('finishing both topics does', studiedSections(sectionOne).join(',') === '1')
+check('and the plan then interleaves rather than blocking', schedulePlan(sectionOne).mode === 'interleaved')
+
+const identityIds = CURRICULUM.filter((entry) => entry.topicId === 'identity').map((entry) => entry.id)
+const identitySkipped: Record<string, LessonProgress> = {}
+for (const id of identityIds) identitySkipped[id] = walked({ skipped: true, passedUnaided: false })
+check('a topic marked as known rather than walked still opens its section', studiedSections(identitySkipped).includes(5))
+
+const mixedQueue = buildDrillQueue(facts, {}, { sectionId: null, priorityOnly: false, sections: [1, 5] }, today)
+check(
+  'the drill pool honours a set of sections',
+  mixedQueue.order.length > 0 &&
+    mixedQueue.order.every((id) => {
+      const fact = facts.find((candidate) => candidate.id === id)
+      return fact !== undefined && (fact.section === 1 || fact.section === 5)
+    }),
+)
+const allSections = buildDrillQueue(facts, {}, { sectionId: null, priorityOnly: false }, today)
+check('and an unset set means every section', allSections.order.length > mixedQueue.order.length)
+
+section('Weak spots')
+
+check(
+  'one wrong answer is not a weak spot',
+  weakSpots({ 'sql-not-in-with-null': { fellFor: 1, lastFellAt: today, clearedAt: null } }).length === 0,
+)
+check(
+  'two are',
+  weakSpots({ 'sql-not-in-with-null': { fellFor: 2, lastFellAt: today, clearedAt: null } })[0]?.id ===
+    'sql-not-in-with-null',
+)
+check(
+  'and a later correct answer on the same one clears it',
+  weakSpots({ 'sql-not-in-with-null': { fellFor: 2, lastFellAt: today, clearedAt: today } }).length === 0,
+)
+check(
+  'an unknown misconception id is ignored rather than crashing',
+  weakSpots({ 'not-a-real-id': { fellFor: 5, lastFellAt: today, clearedAt: null } }).length === 0,
+)
 
 // --------------------------------------------------------------------- done
 

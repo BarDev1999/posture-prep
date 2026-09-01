@@ -1,8 +1,10 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { ProgressBar } from '../components/ProgressBar.tsx'
+import { CURRICULUM } from '../data/curriculum.ts'
 import { content, questions, sections } from '../lib/content.ts'
 import { mergeDeck } from '../lib/deck.ts'
 import { todayISO } from '../lib/date.ts'
+import { isFinished, lessonState, nextOpenLesson, schedulePlan, weakSpots } from '../lib/learn.ts'
 import {
   buildDrillQueue,
   currentStreak,
@@ -19,6 +21,10 @@ import { useAppDispatch, useProgress } from '../state/AppContext.tsx'
  *
  * Weight is the real variable here, so it is shown as a number and as the
  * length of a bar, not as five decorative colours.
+ *
+ * Two things sit between the action and the sections, and only when they have
+ * something to say: the weak spots, meaning misconceptions fallen for twice and
+ * not yet cleared, and the Learn module position.
  */
 export function Home() {
   const progress = useProgress()
@@ -27,9 +33,19 @@ export function Home() {
   const today = todayISO()
   const facts = mergeDeck(progress.extraFacts)
 
+  const plan = schedulePlan(progress.lessons)
+  const spots = weakSpots(progress.misconceptions)
+  const nextLesson = nextOpenLesson(progress.lessons, progress.settings.guidedOrder)
+  const lessonsDone = CURRICULUM.filter((entry) => isFinished(lessonState(entry, progress.lessons))).length
+
   const stats = sectionStats(sections, facts, questions, progress.facts, progress.questions, today)
   const ranked = rankByNeed(stats)
-  const queue = buildDrillQueue(facts, progress.facts, { sectionId: null, priorityOnly: false }, today)
+  const queue = buildDrillQueue(
+    facts,
+    progress.facts,
+    { sectionId: null, priorityOnly: false, sections: plan.mode === 'interleaved' ? plan.sections : null },
+    today,
+  )
   const recommendation = recommendNext(stats, queue)
   const streak = currentStreak(progress.sessions, today)
   const daysLeft = daysUntilExam(progress.settings.examDate, today)
@@ -38,7 +54,7 @@ export function Home() {
 
   const startSession = () => {
     dispatch({ type: 'set-section-filter', value: null })
-    navigate('/drill')
+    navigate(plan.mode === 'open' ? '/drill' : '/drill?mix=studied')
   }
 
   const drillSection = (sectionId: number) => {
@@ -78,11 +94,55 @@ export function Home() {
             </button>
           ) : null}
 
-          <p className="mt-3 text-sm text-faint">
+          {/* The schedule, said out loud, because a rule people can see is a
+              rule people trust. It is a default rather than a lock. */}
+          <p className="mt-3 text-xs leading-relaxed text-faint">{plan.note}</p>
+
+          <p className="mt-2 text-sm text-faint">
             {todaySession
               ? `${todaySession.itemsCompleted} cards rated today.`
               : 'No cards rated today yet. A session is any number of cards.'}
           </p>
+        </div>
+      </section>
+
+      {spots.length > 0 ? (
+        <section className="mt-6">
+          <h2 className="eyebrow mb-2">Weak spots</h2>
+          <ul className="sheet ruled">
+            {spots.slice(0, 4).map((spot) => (
+              <li key={spot.id} className="px-3 py-3">
+                <p className="flex items-baseline justify-between gap-2">
+                  <span className="text-sm font-semibold">{spot.name}</span>
+                  <span className="data shrink-0">fell for it {spot.fellFor}&times;</span>
+                </p>
+                <p className="mt-1 text-sm leading-relaxed text-muted">{spot.belief}</p>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs leading-relaxed text-faint">
+            A misconception you have answered wrongly twice. Get a later lesson trap on the same one right and it
+            clears.
+          </p>
+        </section>
+      ) : null}
+
+      <section className="mt-6">
+        <div className="flex items-baseline justify-between gap-2">
+          <h2 className="eyebrow">Learn</h2>
+          <span className="data">{lessonsDone} of {CURRICULUM.length} lessons</span>
+        </div>
+        <div className="mt-2 sheet p-4">
+          <ProgressBar value={lessonsDone / CURRICULUM.length} label="Lessons finished" />
+          <p className="mt-2 text-sm leading-relaxed">
+            {nextLesson ? `Next up: ${nextLesson.number}. ${nextLesson.title}` : 'Every lesson is finished.'}
+          </p>
+          <Link
+            to={nextLesson ? `/learn/${nextLesson.id}` : '/learn'}
+            className="mt-3 flex min-h-12 items-center justify-center border border-rule px-4 text-sm text-muted hover:border-rule-strong hover:text-ink"
+          >
+            {nextLesson ? 'Open the lesson' : 'Back to the topic map'}
+          </Link>
         </div>
       </section>
 

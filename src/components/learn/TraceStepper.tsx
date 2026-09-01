@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { seededOrder } from '../../lib/shuffle.ts'
 import type { Trace } from '../../types/lesson.ts'
 
 /**
@@ -25,6 +26,13 @@ export function TraceStepper({
 }) {
   const [picked, setPicked] = useState<number | null>(null)
   const [frame, setFrame] = useState(-1)
+
+  // The prediction is authored with the right answer first. Position should
+  // teach nothing, so the order is seeded on the question instead.
+  const options = useMemo(
+    () => seededOrder(trace.predict.options, trace.predict.question),
+    [trace.predict.options, trace.predict.question],
+  )
 
   const answered = picked !== null
   const current = frame >= 0 ? trace.frames[frame] : undefined
@@ -62,7 +70,7 @@ export function TraceStepper({
 
       <p className="mt-3 text-sm font-semibold">{trace.predict.question}</p>
       <ul className="mt-2 space-y-2">
-        {trace.predict.options.map((option, index) => {
+        {options.map((option, index) => {
           const show = answered && (index === picked || option.correct)
           return (
             <li key={option.text}>

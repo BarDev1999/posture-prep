@@ -14,6 +14,12 @@ import { addDays, daysBetween } from './date.ts'
 export type DrillFilters = {
   /** null means every section, which is the interleaved default. */
   sectionId: number | null
+  /**
+   * A set of sections to interleave across, used by the hybrid schedule once a
+   * Learn topic is finished. null means no restriction. It is applied on top of
+   * sectionId rather than instead of it, so a single section pick still wins.
+   */
+  sections?: number[] | null
   priorityOnly: boolean
   /**
    * An explicit set of fact ids, used by a lesson handoff so that a drill
@@ -91,6 +97,7 @@ export function buildDrillQueue(
     // do not apply to a set that was chosen deliberately.
     if (wanted) return wanted.has(fact.id)
     if (filters.sectionId !== null && fact.section !== filters.sectionId) return false
+    if (filters.sections && filters.sections.length > 0 && !filters.sections.includes(fact.section)) return false
     if (filters.priorityOnly && !fact.isPriority) return false
     return true
   })

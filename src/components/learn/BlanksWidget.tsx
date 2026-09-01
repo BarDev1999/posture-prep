@@ -75,7 +75,7 @@ export function BlanksWidget({
                   type="text"
                   value={answers[index] ?? ''}
                   disabled={done}
-                  onChange={(event) => setAnswers({ ...answers, [index]: event.target.value })}
+                  onChange={(event) => setAnswers((current) => ({ ...current, [index]: event.target.value }))}
                   spellCheck={false}
                   autoCapitalize="off"
                   autoCorrect="off"
