@@ -194,6 +194,61 @@ const PRACTICE: Record<string, { questionIds: string[]; factIds: string[] }> = {
   L12: { questionIds: ['Q1.13', 'Q1.18'], factIds: ['F4'] },
   L13: { questionIds: ['Q1.16'], factIds: ['F2'] },
   L14: { questionIds: ['Q1.10', 'Q1.11'], factIds: [] },
+  L14X: { questionIds: ['Q1.19', 'Q1.17'], factIds: ['F1'] },
+
+  // ------------------------------------------------------------- Python
+  L15: { questionIds: ['Q1.20'], factIds: [] },
+  L16: { questionIds: ['Q1.22', 'Q1.20'], factIds: [] },
+  L17: { questionIds: ['Q1.21'], factIds: [] },
+  L18: { questionIds: ['Q1.20'], factIds: [] },
+  L19: { questionIds: ['Q1.23'], factIds: [] },
+  L20: { questionIds: ['Q1.23'], factIds: [] },
+  L21: { questionIds: ['Q1.23'], factIds: [] },
+  L22: { questionIds: ['Q4.9'], factIds: ['F7'] },
+  L23: { questionIds: ['Q4.10'], factIds: ['F8'] },
+
+  // --------------------------------------------------------- AI security
+  L24: { questionIds: ['Q2.20'], factIds: ['F21'] },
+  L25: { questionIds: ['Q2.2'], factIds: ['F13'] },
+  L26: { questionIds: ['Q2.1', 'Q2.3'], factIds: ['F12'] },
+  L27: { questionIds: ['Q2.8'], factIds: ['F23'] },
+  L28: { questionIds: ['Q2.6', 'Q2.7'], factIds: ['F14', 'F15'] },
+  L29: { questionIds: ['Q2.11'], factIds: ['F16'] },
+  L30: { questionIds: ['Q2.12', 'Q2.13'], factIds: ['F17'] },
+  L31: { questionIds: ['Q2.14', 'Q2.15'], factIds: ['F18'] },
+  L32: { questionIds: ['Q2.16', 'Q2.17'], factIds: ['F19'] },
+  L33: { questionIds: ['Q2.18', 'Q2.19'], factIds: ['F20'] },
+  L34: { questionIds: ['Q2.21', 'Q2.22'], factIds: ['F9', 'F10', 'F11', 'F22'] },
+
+  // ------------------------------------------------------ Cloud security
+  L35: { questionIds: ['Q3.14'], factIds: ['F35'] },
+  L36: { questionIds: ['Q3.2', 'Q3.6'], factIds: ['F26', 'F34'] },
+  L37: { questionIds: ['Q3.1', 'Q3.3'], factIds: ['F27'] },
+  L38: { questionIds: ['Q3.11'], factIds: ['F32'] },
+  L39: { questionIds: ['Q3.7'], factIds: ['F24', 'F25'] },
+  L40: { questionIds: ['Q3.10', 'Q3.13'], factIds: ['F33'] },
+  L41: { questionIds: ['Q3.8', 'Q3.5'], factIds: ['F28', 'F29'] },
+  L42: { questionIds: ['Q3.9', 'Q3.12'], factIds: ['F30', 'F31'] },
+  L43: { questionIds: ['Q3.15', 'Q3.16', 'Q3.17', 'Q3.18'], factIds: ['F35'] },
+
+  // --------------------------------------------- Linux, web, containers
+  L44: { questionIds: ['Q4.1', 'Q4.4'], factIds: ['F36', 'F39'] },
+  L45: { questionIds: ['Q4.2', 'Q4.3', 'Q4.5'], factIds: ['F37', 'F38'] },
+  L46: { questionIds: ['Q4.7', 'Q4.14'], factIds: ['F41', 'F43', 'F47'] },
+  L47: { questionIds: ['Q4.9', 'Q4.10'], factIds: ['F7', 'F8'] },
+  L48: { questionIds: ['Q4.11', 'Q4.12'], factIds: ['F42', 'F44', 'F45'] },
+  L49: { questionIds: ['Q4.13'], factIds: ['F46'] },
+  L50: { questionIds: ['Q4.15'], factIds: ['F48'] },
+  L51: { questionIds: ['Q4.6', 'Q4.16', 'Q4.17'], factIds: ['F40', 'F49'] },
+  L52: { questionIds: ['Q4.18'], factIds: ['F50'] },
+
+  // ------------------------------------------------------------ Identity
+  L53: { questionIds: ['Q4.8'], factIds: [] },
+  L54: { questionIds: ['Q5.1'], factIds: ['F51'] },
+  L55: { questionIds: ['Q5.2'], factIds: ['F51'] },
+  L56: { questionIds: ['Q5.6'], factIds: ['F52', 'F53'] },
+  L57: { questionIds: ['Q5.3', 'Q5.4', 'Q5.5'], factIds: ['F54', 'F56', 'F57'] },
+  L58: { questionIds: ['Q5.7', 'Q5.8', 'Q5.9'], factIds: ['F55', 'F58'] },
 }
 
 const NO_PRACTICE = { questionIds: [], factIds: [] }

@@ -668,14 +668,28 @@ check(
   ),
 )
 check('an empty Python answer is never accepted', pythonProduce.every(({ produce }) => !pythonBlanksSatisfied(produce, {})))
+/**
+ * The answer as a whole token, not as a substring: the answer `is` appears
+ * inside the word comparison, and a hint that says "the comparison" is not
+ * giving anything away.
+ */
+function hintGivesAnswer(hint: string, answer: string): boolean {
+  const escaped = answer.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const left = /^\w/.test(answer) ? '\\b' : ''
+  const right = /\w$/.test(answer) ? '\\b' : ''
+  return new RegExp(`${left}${escaped}${right}`).test(hint)
+}
+
 check(
   'every Python blank carries a hint that describes the job, not the answer',
   pythonProduce.every(({ produce }) =>
-    produce.blanks.every((blank) => blank.hint.length > 20 && !blank.hint.includes(blank.answer)),
+    produce.blanks.every((blank) => blank.hint.length > 20 && !hintGivesAnswer(blank.hint, blank.answer)),
   ),
   pythonProduce
     .flatMap(({ lesson, produce }) =>
-      produce.blanks.filter((blank) => blank.hint.length <= 20 || blank.hint.includes(blank.answer)).map(() => lesson.id),
+      produce.blanks
+        .filter((blank) => blank.hint.length <= 20 || hintGivesAnswer(blank.hint, blank.answer))
+        .map((blank) => `${lesson.id}:${blank.answer}`),
     )
     .join(', '),
 )
