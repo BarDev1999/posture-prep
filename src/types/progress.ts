@@ -83,6 +83,11 @@ export type LessonProgress = {
   aided: boolean
   /** Step 7 passed with no drop back to the Parsons fallback. */
   passedUnaided: boolean
+  /**
+   * Marked as known rather than walked. It counts as finished everywhere a
+   * count is shown, and nowhere that fluency or the guidance tier is decided.
+   */
+  skipped: boolean
   completedAt: string | null
 }
 
@@ -110,6 +115,12 @@ export type Settings = {
   priorityOnly: boolean
   /** null means all sections, which is the interleaved default. */
   sectionFilter: number | null
+  /**
+   * Learn module. On, a lesson stays locked until its prerequisites are done.
+   * Off, the default, the graph advises instead: every lesson opens, so the
+   * parts already known can be skipped.
+   */
+  guidedOrder: boolean
 }
 
 export type ProgressState = {

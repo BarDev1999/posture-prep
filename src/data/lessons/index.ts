@@ -24,6 +24,11 @@ const WRITTEN: Record<TopicId, string[]> = {
 
 const LOADERS: Partial<Record<TopicId, () => Promise<{ lessons: Lesson[] }>>> = {
   sql: () => import('./sql.ts'),
+  python: () => import('./python.ts'),
+  'ai-security': () => import('./ai-security.ts'),
+  cloud: () => import('./cloud.ts'),
+  'linux-web-containers': () => import('./linux-web-containers.ts'),
+  identity: () => import('./identity.ts'),
 }
 
 const topicOf = new Map<string, TopicId>()

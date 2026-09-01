@@ -43,6 +43,9 @@ export type Action =
   | { type: 'lesson-produce'; lessonId: string; passed: boolean }
   | { type: 'lesson-trap'; misconceptionId: string; correct: boolean; today: string }
   | { type: 'lesson-complete'; lessonId: string; topicId: string; today: string }
+  | { type: 'lesson-skip'; lessonId: string; today: string }
+  | { type: 'lesson-reopen'; lessonId: string }
+  | { type: 'lesson-aided'; lessonId: string }
   | { type: 'save-mock'; attempt: MockAttempt }
   | { type: 'import-facts'; facts: ExtraFact[] }
   | { type: 'remove-imported'; sourceName: string }
@@ -51,6 +54,7 @@ export type Action =
   | { type: 'set-exam-date'; examDate: string }
   | { type: 'set-priority-only'; value: boolean }
   | { type: 'set-section-filter'; value: number | null }
+  | { type: 'set-guided-order'; value: boolean }
   | { type: 'replace'; state: ProgressState }
   | { type: 'reset' }
 
@@ -163,7 +167,7 @@ export function reducer(state: ProgressState, action: Action): ProgressState {
       // Reaching the end of a lesson twice must not count twice towards fluency.
       if (previous.status === 'complete') return state
       const topic = state.topics[action.topicId] ?? NEW_TOPIC_PROGRESS
-      const clean = previous.passedUnaided
+      const clean = previous.passedUnaided && !previous.skipped
       const cleanCompletions = topic.cleanCompletions + (clean ? 1 : 0)
       return {
         ...state,
@@ -184,6 +188,52 @@ export function reducer(state: ProgressState, action: Action): ProgressState {
             cleanCompletions,
             guidanceTier: guidanceTier(cleanCompletions),
           },
+        },
+      }
+    }
+    case 'lesson-skip': {
+      const previous = state.lessons[action.lessonId] ?? NEW_LESSON_PROGRESS
+      if (previous.status === 'complete') return state
+      // Marked as known. It counts as finished for unlocking and for every
+      // count on screen, and it deliberately touches no topic counter: fluency
+      // and the guidance tier are claims about lessons actually worked through.
+      return {
+        ...state,
+        lessons: {
+          ...state.lessons,
+          [action.lessonId]: {
+            ...previous,
+            status: 'complete',
+            currentStep: TOTAL_STEPS,
+            skipped: true,
+            completedAt: action.today,
+          },
+        },
+      }
+    }
+    case 'lesson-reopen': {
+      const previous = state.lessons[action.lessonId]
+      if (!previous) return state
+      // Back to the start, keeping nothing but the fact that it was opened. The
+      // topic counters stay as they are: a completion already counted is not
+      // withdrawn by rereading the lesson.
+      return {
+        ...state,
+        lessons: {
+          ...state.lessons,
+          [action.lessonId]: { ...NEW_LESSON_PROGRESS, status: 'in-progress', currentStep: 1 },
+        },
+      }
+    }
+    case 'lesson-aided': {
+      const previous = state.lessons[action.lessonId] ?? NEW_LESSON_PROGRESS
+      if (previous.aided) return state
+      // A skipped step is help taken, so the lesson stops counting as clean.
+      return {
+        ...state,
+        lessons: {
+          ...state.lessons,
+          [action.lessonId]: { ...previous, aided: true, passedUnaided: false },
         },
       }
     }
@@ -214,6 +264,8 @@ export function reducer(state: ProgressState, action: Action): ProgressState {
       return { ...state, settings: { ...state.settings, priorityOnly: action.value } }
     case 'set-section-filter':
       return { ...state, settings: { ...state.settings, sectionFilter: action.value } }
+    case 'set-guided-order':
+      return { ...state, settings: { ...state.settings, guidedOrder: action.value } }
     case 'replace':
       return action.state
     case 'reset':

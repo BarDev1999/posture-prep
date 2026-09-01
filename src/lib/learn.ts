@@ -1,7 +1,14 @@
 import { CURRICULUM, curriculumEntry } from '../data/curriculum.ts'
 import type { CurriculumEntry } from '../data/curriculum.ts'
 import { hasLesson } from '../data/lessons/index.ts'
-import type { FadeExercise, ParsonsBlock, ParsonsExercise, StepKey } from '../types/lesson.ts'
+import type {
+  FadeExercise,
+  ParsonsBlock,
+  ParsonsExercise,
+  ProduceExercise,
+  RuleRow,
+  StepKey,
+} from '../types/lesson.ts'
 import { STEP_KEYS } from '../types/lesson.ts'
 import type { GuidanceTier, Level, LessonProgress, TopicProgress } from '../types/progress.ts'
 
@@ -19,6 +26,7 @@ export const NEW_LESSON_PROGRESS: LessonProgress = {
   produceAttempts: 0,
   aided: false,
   passedUnaided: false,
+  skipped: false,
   completedAt: null,
 }
 
@@ -41,29 +49,50 @@ export function topicProgress(topics: Record<string, TopicProgress>, topicId: st
 
 // -------------------------------------------------------------- unlock state
 
-export type LessonState = 'locked' | 'unwritten' | 'available' | 'in-progress' | 'complete'
+export type LessonState = 'locked' | 'unwritten' | 'available' | 'in-progress' | 'complete' | 'skipped'
 
 /**
- * A lesson opens only when every prerequisite is complete. A lesson whose
- * prerequisites are met but whose content is not written yet reads as
- * "unwritten", which is a different thing from locked and should say so.
+ * Guided order is a setting, and it is off by default.
+ *
+ * The original design locked a lesson until every prerequisite was complete.
+ * That is right for a learner walking the curriculum from lesson one, and wrong
+ * for one who already knows the first half of a topic: making him sit through
+ * six lessons on SELECT to reach JOINs costs more than the ordering gains. So
+ * the graph is still there, still drawn, still named on every row, but by
+ * default it advises rather than blocks. Turning `guided` on restores the
+ * original locking exactly, and the verifier still exercises that path.
  */
-export function lessonState(entry: CurriculumEntry, lessons: Record<string, LessonProgress>): LessonState {
-  const unmet = entry.prerequisites.some((prerequisiteId) => {
-    return lessonProgress(lessons, prerequisiteId).status !== 'complete'
-  })
-  if (unmet) return 'locked'
+export function lessonState(
+  entry: CurriculumEntry,
+  lessons: Record<string, LessonProgress>,
+  guided = false,
+): LessonState {
+  if (guided) {
+    const unmet = entry.prerequisites.some((prerequisiteId) => {
+      return lessonProgress(lessons, prerequisiteId).status !== 'complete'
+    })
+    if (unmet) return 'locked'
+  }
   if (!hasLesson(entry.id)) return 'unwritten'
   const progress = lessonProgress(lessons, entry.id)
-  if (progress.status === 'complete') return 'complete'
+  if (progress.status === 'complete') return progress.skipped ? 'skipped' : 'complete'
   if (progress.status === 'in-progress') return 'in-progress'
   return 'available'
 }
 
-export function canOpenLesson(lessonId: string, lessons: Record<string, LessonProgress>): boolean {
+/** Finished, however it was finished. Skipping counts for unlocking and totals. */
+export function isFinished(state: LessonState): boolean {
+  return state === 'complete' || state === 'skipped'
+}
+
+export function canOpenLesson(
+  lessonId: string,
+  lessons: Record<string, LessonProgress>,
+  guided = false,
+): boolean {
   const entry = curriculumEntry(lessonId)
   if (!entry) return false
-  const state = lessonState(entry, lessons)
+  const state = lessonState(entry, lessons, guided)
   return state !== 'locked' && state !== 'unwritten'
 }
 
@@ -79,10 +108,13 @@ export function blockingPrerequisites(
 }
 
 /** The first lesson the learner can actually open, or null when there is none. */
-export function nextOpenLesson(lessons: Record<string, LessonProgress>): CurriculumEntry | null {
-  const started = CURRICULUM.find((entry) => lessonState(entry, lessons) === 'in-progress')
+export function nextOpenLesson(
+  lessons: Record<string, LessonProgress>,
+  guided = false,
+): CurriculumEntry | null {
+  const started = CURRICULUM.find((entry) => lessonState(entry, lessons, guided) === 'in-progress')
   if (started) return started
-  return CURRICULUM.find((entry) => lessonState(entry, lessons) === 'available') ?? null
+  return CURRICULUM.find((entry) => lessonState(entry, lessons, guided) === 'available') ?? null
 }
 
 // ------------------------------------------------------------ backward fading
@@ -117,12 +149,30 @@ export function normaliseSql(value: string): string {
     .toLowerCase()
 }
 
+/**
+ * Prose rows, meaning the rule template. Nothing is stripped except spacing,
+ * because a comma inside "S3 bucket policy, ACL, Public Access Block" is part
+ * of the sentence rather than punctuation the grader should be lenient about.
+ */
+export function normaliseProse(value: string): string {
+  return value.replace(/\s+/g, ' ').trim().toLowerCase()
+}
+
+/**
+ * Python is case sensitive and indentation sensitive, so the only thing the
+ * grader forgives is the spacing around it and a trailing colon typed twice.
+ */
+export function normalisePython(value: string): string {
+  return value.replace(/\s+/g, ' ').trim()
+}
+
 export function fadeAnswerAccepted(exercise: FadeExercise, index: number, answer: string): boolean {
   const step = exercise.steps[index]
   if (!step) return false
-  const candidate = normaliseSql(answer)
+  const normalise = step.prose ? normaliseProse : normaliseSql
+  const candidate = normalise(answer)
   if (candidate.length === 0) return false
-  const accepted = [step.code, ...(step.accept ?? [])].map(normaliseSql)
+  const accepted = [step.code, ...(step.accept ?? [])].map(normalise)
   return accepted.includes(candidate)
 }
 
@@ -143,9 +193,28 @@ export function visibleBlocks(exercise: ParsonsExercise, level: Level): ParsonsB
   return exercise.blocks
 }
 
-export function parsonsSatisfied(exercise: ParsonsExercise, placed: string[]): boolean {
+export function blockIndent(block: ParsonsBlock | undefined): number {
+  return block?.indent ?? 0
+}
+
+/** Python blocks are graded on their indentation as well as their order. */
+export function indentMatters(exercise: ParsonsExercise): boolean {
+  return exercise.language === 'python' || exercise.language === 'yaml'
+}
+
+export function parsonsSatisfied(
+  exercise: ParsonsExercise,
+  placed: string[],
+  indents: Record<string, number> = {},
+): boolean {
   if (placed.length !== exercise.solution.length) return false
-  return placed.every((blockId, index) => blockId === exercise.solution[index])
+  const orderRight = placed.every((blockId, index) => blockId === exercise.solution[index])
+  if (!orderRight) return false
+  if (!indentMatters(exercise)) return true
+  return placed.every((blockId) => {
+    const block = exercise.blocks.find((candidate) => candidate.id === blockId)
+    return (indents[blockId] ?? 0) === blockIndent(block)
+  })
 }
 
 /**
@@ -157,6 +226,69 @@ export function firstWrongPosition(exercise: ParsonsExercise, placed: string[]):
     if (placed[index] !== exercise.solution[index]) return index
   }
   return placed.length === exercise.solution.length ? null : placed.length
+}
+
+/** The first block whose order is right but whose indentation is not. */
+export function firstWrongIndent(
+  exercise: ParsonsExercise,
+  placed: string[],
+  indents: Record<string, number>,
+): number | null {
+  if (!indentMatters(exercise)) return null
+  for (let index = 0; index < placed.length; index++) {
+    const blockId = placed[index] as string
+    const block = exercise.blocks.find((candidate) => candidate.id === blockId)
+    if ((indents[blockId] ?? 0) !== blockIndent(block)) return index
+  }
+  return null
+}
+
+// ---------------------------------------------------------- free production
+
+/** The `[[1]]` markers in a Python template, in the order they appear. */
+export function templateSegments(template: string): { text: string; blank: number | null }[] {
+  const out: { text: string; blank: number | null }[] = []
+  const pattern = /\[\[(\d+)\]\]/g
+  let last = 0
+  let match = pattern.exec(template)
+  while (match) {
+    out.push({ text: template.slice(last, match.index), blank: null })
+    out.push({ text: '', blank: Number(match[1]) })
+    last = match.index + match[0].length
+    match = pattern.exec(template)
+  }
+  out.push({ text: template.slice(last), blank: null })
+  return out.filter((segment) => segment.blank !== null || segment.text.length > 0)
+}
+
+export function pythonBlankAccepted(
+  exercise: Extract<ProduceExercise, { kind: 'python' }>,
+  index: number,
+  answer: string,
+): boolean {
+  const blank = exercise.blanks[index]
+  if (!blank) return false
+  const candidate = normalisePython(answer)
+  if (candidate.length === 0) return false
+  return [blank.answer, ...(blank.accept ?? [])].map(normalisePython).includes(candidate)
+}
+
+export function pythonBlanksSatisfied(
+  exercise: Extract<ProduceExercise, { kind: 'python' }>,
+  answers: Record<number, string>,
+): boolean {
+  return exercise.blanks.every((_, index) => pythonBlankAccepted(exercise, index, answers[index] ?? ''))
+}
+
+export function ruleRowCorrect(row: RuleRow, choice: string | undefined): boolean {
+  return choice !== undefined && normaliseProse(choice) === normaliseProse(row.answer)
+}
+
+export function ruleSatisfied(
+  exercise: Extract<ProduceExercise, { kind: 'rule' }>,
+  choices: Record<string, string>,
+): boolean {
+  return exercise.rows.every((row) => ruleRowCorrect(row, choices[row.part]))
 }
 
 // ------------------------------------------------------------ guidance fading
@@ -176,6 +308,17 @@ export function guidanceTierNote(tier: GuidanceTier): string {
   if (tier === 'minimal') return 'Words, model, write it, trap. Worked examples are behind a button now.'
   if (tier === 'faded') return 'The worked example is skipped. You start at the light fade.'
   return 'All nine steps, with the worked example shown in full.'
+}
+
+/**
+ * Which steps the player actually walks at a tier. The steps themselves never
+ * change and neither does their order: a tier only decides which of them are
+ * shown, and anything hidden is still reachable from the button in the header.
+ */
+export function stepsForTier(tier: GuidanceTier): StepKey[] {
+  if (tier === 'minimal') return ['vocabulary', 'model', 'produce', 'trap', 'handoff']
+  if (tier === 'faded') return ['vocabulary', 'model', 'fadeLight', 'fadeHeavy', 'parsons', 'produce', 'trap', 'handoff']
+  return [...STEP_KEYS]
 }
 
 /** Two consecutive unaided step 7 completions in a topic. */
@@ -199,18 +342,25 @@ export type TopicCounts = {
   total: number
   written: number
   complete: number
+  skipped: number
   available: number
 }
 
-export function topicCounts(entries: CurriculumEntry[], lessons: Record<string, LessonProgress>): TopicCounts {
+export function topicCounts(
+  entries: CurriculumEntry[],
+  lessons: Record<string, LessonProgress>,
+  guided = false,
+): TopicCounts {
   let written = 0
   let complete = 0
+  let skipped = 0
   let available = 0
   for (const entry of entries) {
     if (hasLesson(entry.id)) written += 1
-    const state = lessonState(entry, lessons)
+    const state = lessonState(entry, lessons, guided)
     if (state === 'complete') complete += 1
+    if (state === 'skipped') skipped += 1
     if (state === 'available' || state === 'in-progress') available += 1
   }
-  return { total: entries.length, written, complete, available }
+  return { total: entries.length, written, complete, skipped, available }
 }

@@ -2,8 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Markdown } from '../components/Markdown.tsx'
 import { ResultTable } from '../components/ResultTable.tsx'
+import { BlanksWidget } from '../components/learn/BlanksWidget.tsx'
 import { Diagram } from '../components/learn/Diagram.tsx'
 import { ParsonsWidget } from '../components/learn/ParsonsWidget.tsx'
+import { RuleBuilder } from '../components/learn/RuleBuilder.tsx'
+import { TraceStepper } from '../components/learn/TraceStepper.tsx'
 import { curriculumEntry, getTopic } from '../data/curriculum.ts'
 import type { CurriculumEntry } from '../data/curriculum.ts'
 import { loadLesson } from '../data/lessons/index.ts'
@@ -15,24 +18,40 @@ import {
   blankedIndices,
   blockingPrerequisites,
   fadeAnswerAccepted,
+  guidanceTierNote,
   lessonProgress,
   lessonState,
   stepKeyAt,
+  stepsForTier,
+  topicProgress,
 } from '../lib/learn.ts'
 import { grade, gradeError, orderMatters } from '../lib/sql/grade.ts'
 import type { GradeResult } from '../lib/sql/grade.ts'
 import type { QueryResult } from '../lib/sql/types.ts'
 import { useAppDispatch, useProgress } from '../state/AppContext.tsx'
-import { STEP_TITLES } from '../types/lesson.ts'
-import type { FadeExercise, Lesson, ProduceExercise, TrapExercise, VocabTerm, WorkedExample } from '../types/lesson.ts'
+import { STEP_KEYS, STEP_TITLES } from '../types/lesson.ts'
+import type {
+  FadeExercise,
+  Lesson,
+  ProduceExercise,
+  StepKey,
+  TrapExercise,
+  VocabTerm,
+  WorkedExample,
+} from '../types/lesson.ts'
 
 /**
  * The lesson player. One step per screen, nine of them, always in order.
  *
  * Forward is only allowed when the current step is satisfied, and what counts
  * as satisfied is different per step: reading is enough for the first two, the
- * worked example wants its self explanation prompts opened, and the exercises
- * want a right answer. Back is always allowed, including back out of the lesson.
+ * worked example wants its self explanation prompts opened and its trace walked
+ * to the end, and the exercises want a right answer. Back is always allowed,
+ * including back out of the lesson.
+ *
+ * Two things can shorten the walk. The guidance tier hides steps the learner
+ * has outgrown, automatically, per topic. And any exercise step can be skipped
+ * by hand, which costs the lesson its clean completion and says so.
  */
 export default function Lesson() {
   const { lessonId = '' } = useParams()
@@ -50,7 +69,8 @@ function LessonPlayer({ lessonId }: { lessonId: string }) {
 
   const entry = curriculumEntry(lessonId)
   const stored = lessonProgress(progress.lessons, lessonId)
-  const state = entry ? lessonState(entry, progress.lessons) : 'locked'
+  const guided = progress.settings.guidedOrder
+  const state = entry ? lessonState(entry, progress.lessons, guided) : 'locked'
 
   // A topic's lessons are their own chunk, fetched on the way in. The component
   // is keyed on the lesson id, so this runs once per lesson opened and the
@@ -74,6 +94,7 @@ function LessonPlayer({ lessonId }: { lessonId: string }) {
 
   const [step, setStep] = useState(() => Math.min(TOTAL_STEPS, Math.max(1, stored.currentStep)))
   const [openPrompts, setOpenPrompts] = useState<number[]>([])
+  const [traceDone, setTraceDone] = useState(false)
   const [lightDone, setLightDone] = useState(false)
   const [heavyDone, setHeavyDone] = useState(false)
   const [parsonsDone, setParsonsDone] = useState(false)
@@ -81,6 +102,7 @@ function LessonPlayer({ lessonId }: { lessonId: string }) {
   const [droppedBack, setDroppedBack] = useState(false)
   const [produceDone, setProduceDone] = useState(false)
   const [trapPick, setTrapPick] = useState<number | null>(null)
+  const [skipped, setSkipped] = useState<StepKey[]>([])
   const top = useRef<HTMLDivElement>(null)
 
   // Every step is its own screen, so each one starts at the top. The shell's
@@ -96,7 +118,7 @@ function LessonPlayer({ lessonId }: { lessonId: string }) {
   }, [dispatch, lesson, lessonId, step])
 
   // Arriving at step 9 is what finishes a lesson: everything before it had to
-  // be satisfied to get here.
+  // be satisfied, or deliberately skipped, to get here.
   useEffect(() => {
     if (lesson && step === TOTAL_STEPS) {
       dispatch({ type: 'lesson-complete', lessonId, topicId: lesson.topicId, today })
@@ -118,6 +140,14 @@ function LessonPlayer({ lessonId }: { lessonId: string }) {
     [dispatch, lessonId],
   )
 
+  const skipStep = useCallback(
+    (key: StepKey) => {
+      setSkipped((current) => (current.includes(key) ? current : [...current, key]))
+      dispatch({ type: 'lesson-aided', lessonId })
+    },
+    [dispatch, lessonId],
+  )
+
   if (!entry) {
     return <Missing />
   }
@@ -127,7 +157,7 @@ function LessonPlayer({ lessonId }: { lessonId: string }) {
     return (
       <Blocked
         title={entry.title}
-        detail={`Finish ${blocking.map((prerequisite) => `${prerequisite.number}. ${prerequisite.title}`).join(' and ')} first.`}
+        detail={`Guided order is on in settings, so this opens once you finish ${blocking.map((prerequisite) => `${prerequisite.number}. ${prerequisite.title}`).join(' and ')}.`}
       />
     )
   }
@@ -137,7 +167,7 @@ function LessonPlayer({ lessonId }: { lessonId: string }) {
       return <Blocked title={entry.title} detail="This lesson could not be loaded. Check the connection and try again." />
     }
     if (state === 'unwritten') {
-      return <Blocked title={entry.title} detail="This lesson is unlocked but has not been written yet." />
+      return <Blocked title={entry.title} detail="This lesson is open but has not been written yet." />
     }
     return (
       <p className="mx-auto w-full max-w-2xl px-4 py-8 text-sm text-muted" role="status">
@@ -146,16 +176,35 @@ function LessonPlayer({ lessonId }: { lessonId: string }) {
     )
   }
 
+  const tier = topicProgress(progress.topics, lesson.topicId).guidanceTier
+  // The fallback lives on step 6, so that step stays reachable after a failed
+  // step 7 even at a tier that normally hides it.
+  const visible = new Set<StepKey>([...stepsForTier(tier), ...(droppedBack ? (['parsons'] as StepKey[]) : [])])
   const stepKey = stepKeyAt(step)
   const promptCount = lesson.steps.worked.steps.filter((workedStep) => workedStep.prompt).length
+  const wasSkipped = skipped.includes(stepKey)
+
+  const nextVisible = (from: number): number => {
+    for (let candidate = from + 1; candidate <= TOTAL_STEPS; candidate++) {
+      if (visible.has(STEP_KEYS[candidate - 1] as StepKey)) return candidate
+    }
+    return TOTAL_STEPS
+  }
+  const previousVisible = (from: number): number | null => {
+    for (let candidate = from - 1; candidate >= 1; candidate--) {
+      if (visible.has(STEP_KEYS[candidate - 1] as StepKey)) return candidate
+    }
+    return null
+  }
 
   const satisfied = (() => {
+    if (wasSkipped) return true
     switch (stepKey) {
       case 'vocabulary':
       case 'model':
         return true
       case 'worked':
-        return openPrompts.length >= promptCount
+        return openPrompts.length >= promptCount && (lesson.steps.worked.trace === undefined || traceDone)
       case 'fadeLight':
         return lightDone
       case 'fadeHeavy':
@@ -177,21 +226,35 @@ function LessonPlayer({ lessonId }: { lessonId: string }) {
     return 'Continue'
   })()
 
+  const canSkipStep =
+    !wasSkipped &&
+    !satisfied &&
+    (stepKey === 'worked' ||
+      stepKey === 'fadeLight' ||
+      stepKey === 'fadeHeavy' ||
+      (stepKey === 'parsons' && !droppedBack) ||
+      stepKey === 'produce')
+
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-4" ref={top}>
       <div className="flex items-baseline justify-between gap-3">
         <Link to="/learn" className="data hover:text-ink">
           &larr; Topic map
         </Link>
-        <span className="data">
-          lesson {entry.number} of 58
-        </span>
+        <span className="data">lesson {entry.number} of 58</span>
       </div>
 
       <h1 className="mt-2 text-lg font-semibold">{lesson.title}</h1>
       <p className="mt-1 text-sm leading-relaxed text-muted">{lesson.objective}</p>
 
-      <StepIndicator step={step} />
+      {tier !== 'full' ? (
+        <p className="mt-3 border-l-2 border-accent bg-sheet p-3 text-xs leading-relaxed text-muted">
+          <span className="font-semibold text-ink">Guidance faded.</span> {guidanceTierNote(tier)} You earned this by
+          finishing step 7 unaided; the difficulty control in settings still overrides it downward.
+        </p>
+      ) : null}
+
+      <StepIndicator step={step} visible={visible} skipped={skipped} />
 
       <div className="mt-4">
         {stepKey === 'vocabulary' ? <VocabularyStep terms={lesson.steps.vocabulary} /> : null}
@@ -216,14 +279,36 @@ function LessonPlayer({ lessonId }: { lessonId: string }) {
             open={openPrompts}
             onOpen={(index) => setOpenPrompts((current) => (current.includes(index) ? current : [...current, index]))}
             remaining={promptCount - openPrompts.length}
+            traceDone={traceDone}
+            onTraceDone={() => setTraceDone(true)}
           />
+        ) : null}
+
+        {/* Faded out of the walk, but never taken away: the worked example is
+            one tap from the step that replaced it. */}
+        {(stepKey === 'fadeLight' && tier === 'faded') || (stepKey === 'produce' && tier === 'minimal') ? (
+          <details className="mt-4 sheet">
+            <summary className="flex min-h-12 cursor-pointer items-center px-3 text-sm font-semibold">
+              Open the worked example
+            </summary>
+            <div className="border-t border-rule px-3 pb-3">
+              <WorkedStep
+                example={lesson.steps.worked}
+                open={lesson.steps.worked.steps.map((_, index) => index)}
+                onOpen={() => {}}
+                remaining={0}
+                traceDone
+                onTraceDone={() => {}}
+              />
+            </div>
+          </details>
         ) : null}
 
         {stepKey === 'fadeLight' ? (
           <FadeStepView
             exercise={lesson.steps.fadeLight}
             heading="The last step is missing. Write it."
-            done={lightDone}
+            done={lightDone || wasSkipped}
             onDone={() => setLightDone(true)}
           />
         ) : null}
@@ -232,7 +317,7 @@ function LessonPlayer({ lessonId }: { lessonId: string }) {
           <FadeStepView
             exercise={lesson.steps.fadeHeavy}
             heading="Only the skeleton is left. Fill in the rest."
-            done={heavyDone}
+            done={heavyDone || wasSkipped}
             onDone={() => setHeavyDone(true)}
           />
         ) : null}
@@ -257,14 +342,14 @@ function LessonPlayer({ lessonId }: { lessonId: string }) {
               key="parsons"
               exercise={lesson.steps.parsons}
               level={progress.settings.level}
-              solved={parsonsDone}
+              solved={parsonsDone || wasSkipped}
               onSolved={() => setParsonsDone(true)}
             />
           )
         ) : null}
 
         {stepKey === 'produce' ? (
-          <ProduceStep exercise={lesson.steps.produce} done={produceDone} onResult={onProduce} />
+          <ProduceStep exercise={lesson.steps.produce} done={produceDone || wasSkipped} onResult={onProduce} />
         ) : null}
 
         {stepKey === 'trap' ? (
@@ -284,14 +369,23 @@ function LessonPlayer({ lessonId }: { lessonId: string }) {
         ) : null}
 
         {stepKey === 'handoff' ? (
-          <HandoffStep lesson={lesson} entry={entry} unaided={stored.passedUnaided} />
+          <HandoffStep
+            lesson={lesson}
+            entry={entry}
+            unaided={stored.passedUnaided}
+            skippedSteps={skipped.length}
+          />
         ) : null}
       </div>
 
       <div className="mt-8 flex gap-2 border-t border-rule pt-4">
         <button
           type="button"
-          onClick={() => (step === 1 ? navigate('/learn') : setStep(step - 1))}
+          onClick={() => {
+            const back = previousVisible(step)
+            if (back === null) navigate('/learn')
+            else setStep(back)
+          }}
           className="min-h-12 flex-1 rounded-sm border border-rule text-sm text-muted hover:text-ink"
         >
           Back
@@ -299,7 +393,7 @@ function LessonPlayer({ lessonId }: { lessonId: string }) {
         {step < TOTAL_STEPS ? (
           <button
             type="button"
-            onClick={() => setStep(droppedBack && stepKey === 'parsons' ? 7 : step + 1)}
+            onClick={() => setStep(droppedBack && stepKey === 'parsons' ? 7 : nextVisible(step))}
             disabled={!satisfied}
             className="min-h-12 flex-[2] rounded-sm bg-accent text-sm font-semibold text-accent-ink disabled:opacity-40"
           >
@@ -318,13 +412,31 @@ function LessonPlayer({ lessonId }: { lessonId: string }) {
       {!satisfied && step < TOTAL_STEPS ? (
         <p className="mt-2 text-center text-xs text-faint">{whyBlocked(stepKey, promptCount - openPrompts.length)}</p>
       ) : null}
+
+      {canSkipStep ? (
+        <button
+          type="button"
+          onClick={() => skipStep(stepKey)}
+          className="mt-3 min-h-11 w-full text-xs text-faint underline underline-offset-2 hover:text-muted"
+        >
+          I know this already, skip the step
+        </button>
+      ) : null}
+
+      {wasSkipped ? (
+        <p className="mt-3 text-center text-xs text-faint">
+          Step skipped. The lesson still finishes; it just stops counting towards fluency in this topic.
+        </p>
+      ) : null}
     </div>
   )
 }
 
 function whyBlocked(stepKey: string, promptsLeft: number): string {
   if (stepKey === 'worked') {
-    return `Open ${promptsLeft} more question${promptsLeft === 1 ? '' : 's'} before moving on. Answering them to yourself is what makes a worked example work.`
+    return promptsLeft > 0
+      ? `Open ${promptsLeft} more question${promptsLeft === 1 ? '' : 's'} before moving on. Answering them to yourself is what makes a worked example work.`
+      : 'Walk the trace to the last line. Predicting and then watching is the whole point of this step.'
   }
   if (stepKey === 'trap') return 'Pick an answer. Getting it wrong is fine and is recorded as a weak spot, not a failure.'
   return 'Finish this step to go on. Back always works.'
@@ -332,23 +444,48 @@ function whyBlocked(stepKey: string, promptsLeft: number): string {
 
 // ------------------------------------------------------------------ chrome
 
-function StepIndicator({ step }: { step: number }) {
+function StepIndicator({
+  step,
+  visible,
+  skipped,
+}: {
+  step: number
+  visible: Set<StepKey>
+  skipped: StepKey[]
+}) {
   const key = stepKeyAt(step)
+  const shownCount = STEP_KEYS.filter((candidate) => visible.has(candidate)).length
+  const position = STEP_KEYS.slice(0, step).filter((candidate) => visible.has(candidate)).length
   return (
     <div className="mt-4">
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-sm font-semibold">{STEP_TITLES[key]}</span>
         <span className="data">
-          step {step} of {TOTAL_STEPS}
+          step {Math.max(1, position)} of {shownCount}
         </span>
       </div>
-      <ol className="mt-1.5 flex gap-1" aria-label={`Step ${step} of ${TOTAL_STEPS}`}>
-        {Array.from({ length: TOTAL_STEPS }, (_, index) => (
-          <li
-            key={index}
-            className={`h-1.5 flex-1 ${index + 1 < step ? 'bg-accent' : index + 1 === step ? 'bg-rule-strong' : 'bg-rule'}`}
-          />
-        ))}
+      <ol className="mt-1.5 flex gap-1" aria-label={`Step ${position} of ${shownCount}`}>
+        {STEP_KEYS.map((candidate, index) => {
+          const hidden = !visible.has(candidate)
+          const wasSkipped = skipped.includes(candidate)
+          return (
+            <li
+              key={candidate}
+              title={STEP_TITLES[candidate]}
+              className={`h-1.5 flex-1 ${
+                hidden
+                  ? 'bg-rule opacity-30'
+                  : wasSkipped
+                    ? 'bg-rule-strong opacity-60'
+                    : index + 1 < step
+                      ? 'bg-accent'
+                      : index + 1 === step
+                        ? 'bg-rule-strong'
+                        : 'bg-rule'
+              }`}
+            />
+          )
+        })}
       </ol>
     </div>
   )
@@ -432,11 +569,15 @@ function WorkedStep({
   open,
   onOpen,
   remaining,
+  traceDone,
+  onTraceDone,
 }: {
   example: WorkedExample
   open: number[]
   onOpen: (index: number) => void
   remaining: number
+  traceDone: boolean
+  onTraceDone: () => void
 }) {
   return (
     <section className="mt-4">
@@ -446,15 +587,21 @@ function WorkedStep({
         {remaining > 0 ? ` ${remaining} left to open.` : ''}
       </p>
 
+      {example.trace ? <TraceStepper trace={example.trace} done={traceDone} onDone={onTraceDone} /> : null}
+
       <ol className="mt-3 space-y-3">
         {example.steps.map((step, index) => (
           <li key={step.label} className="sheet p-3">
             <p className="data">
               {index + 1}. {step.label}
             </p>
-            <pre className="mt-2 overflow-x-auto border-l-2 border-rule-strong bg-raised p-2 font-mono text-code">
-              {step.code}
-            </pre>
+            {step.prose ? (
+              <p className="mt-2 border-l-2 border-rule-strong bg-raised p-2 text-sm leading-relaxed">{step.code}</p>
+            ) : (
+              <pre className="mt-2 overflow-x-auto border-l-2 border-rule-strong bg-raised p-2 font-mono text-code">
+                {step.code}
+              </pre>
+            )}
             <p className="mt-2 text-sm leading-relaxed text-muted">{step.why}</p>
             {step.prompt ? (
               <div className="mt-3 border-t border-rule pt-3">
@@ -525,11 +672,48 @@ function FadeStepView({
               </p>
               {!blanked || done ? (
                 <>
-                  <pre className="mt-2 overflow-x-auto border-l-2 border-rule-strong bg-raised p-2 font-mono text-code">
-                    {step.code}
-                  </pre>
+                  {step.prose ? (
+                    <p className="mt-2 border-l-2 border-rule-strong bg-raised p-2 text-sm leading-relaxed">
+                      {step.code}
+                    </p>
+                  ) : (
+                    <pre className="mt-2 overflow-x-auto border-l-2 border-rule-strong bg-raised p-2 font-mono text-code">
+                      {step.code}
+                    </pre>
+                  )}
                   <p className="mt-2 text-sm leading-relaxed text-muted">{step.why}</p>
                 </>
+              ) : step.choices ? (
+                <div className="mt-2">
+                  <ul className="space-y-1.5">
+                    {step.choices.map((choice) => {
+                      const picked = (answers[index] ?? '') === choice
+                      return (
+                        <li key={choice}>
+                          <button
+                            type="button"
+                            aria-pressed={picked}
+                            onClick={() => setAnswers({ ...answers, [index]: choice })}
+                            className={`w-full rounded-sm border p-2.5 text-left text-sm leading-relaxed ${
+                              picked
+                                ? 'border-accent bg-accent-soft'
+                                : wrong.includes(index)
+                                  ? 'border-high bg-raised'
+                                  : 'border-rule bg-raised'
+                            }`}
+                          >
+                            {choice}
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                  {wrong.includes(index) ? (
+                    <p className="mt-1 text-xs text-muted">
+                      Not that one. Read the row above it: this row has to finish the job that one started.
+                    </p>
+                  ) : null}
+                </div>
               ) : (
                 <div className="mt-2">
                   <label className="block">
@@ -587,6 +771,28 @@ function ProduceStep({
   done: boolean
   onResult: (passed: boolean) => void
 }) {
+  return (
+    <section className="mt-4">
+      <p className="sheet p-3 text-sm leading-relaxed">{exercise.task}</p>
+
+      {exercise.kind === 'sql' ? <SqlProduce exercise={exercise} onResult={onResult} /> : null}
+      {exercise.kind === 'python' ? <BlanksWidget exercise={exercise} done={done} onResult={onResult} /> : null}
+      {exercise.kind === 'rule' ? <RuleBuilder rows={exercise.rows} done={done} onResult={onResult} /> : null}
+
+      {done ? (
+        <p className="mt-3 border-l-2 border-accent bg-sheet p-3 text-sm leading-relaxed">{exercise.closing}</p>
+      ) : null}
+    </section>
+  )
+}
+
+function SqlProduce({
+  exercise,
+  onResult,
+}: {
+  exercise: Extract<ProduceExercise, { kind: 'sql' }>
+  onResult: (passed: boolean) => void
+}) {
   const [draft, setDraft] = useState(exercise.starter)
   const [running, setRunning] = useState(false)
   const [ready, setReady] = useState(false)
@@ -631,8 +837,7 @@ function ProduceStep({
   }
 
   return (
-    <section className="mt-4">
-      <p className="sheet p-3 text-sm leading-relaxed">{exercise.task}</p>
+    <>
       <SchemaPanel />
 
       <label className="mt-3 block">
@@ -675,11 +880,7 @@ function ProduceStep({
           <ResultTable result={rows} />
         </div>
       ) : null}
-
-      {done ? (
-        <p className="mt-3 border-l-2 border-accent bg-sheet p-3 text-sm leading-relaxed">{exercise.closing}</p>
-      ) : null}
-    </section>
+    </>
   )
 }
 
@@ -778,10 +979,12 @@ function HandoffStep({
   lesson,
   entry,
   unaided,
+  skippedSteps,
 }: {
   lesson: Lesson
   entry: CurriculumEntry
   unaided: boolean
+  skippedSteps: number
 }) {
   const misconception = getMisconception(lesson.steps.trap.misconceptionId)
   const topic = getTopic(lesson.topicId)
@@ -802,9 +1005,11 @@ function HandoffStep({
           ))}
         </ul>
         <p className="mt-3 text-xs text-faint">
-          {unaided
-            ? 'You wrote step 7 without falling back to the blocks. That counts towards fluency in this topic.'
-            : 'You needed the blocks at step 7, so this one does not count towards fluency. That is what they are for.'}
+          {skippedSteps > 0
+            ? `You skipped ${skippedSteps} step${skippedSteps === 1 ? '' : 's'}, so this one does not count towards fluency in this topic. Nothing else about it changes.`
+            : unaided
+              ? 'You wrote step 7 without falling back to the blocks. That counts towards fluency in this topic.'
+              : 'You needed the blocks at step 7, so this one does not count towards fluency. That is what they are for.'}
         </p>
       </div>
 
@@ -847,7 +1052,9 @@ function HandoffStep({
         ) : null}
 
         <p className="mt-3 text-xs leading-relaxed text-faint">
-          {topic ? `Practice started from here is blocked to this lesson: same material, repeated, while you are still inside ${topic.title}.` : ''}
+          {topic
+            ? `Practice started from here is blocked to this lesson: same material, repeated, while you are still inside ${topic.title}.`
+            : ''}
         </p>
       </div>
     </section>

@@ -9,6 +9,11 @@ import type { Diagram as DiagramSpec } from '../../types/lesson.ts'
  * valued logic, and a pair of tables joined on a key. Each one is sized in a 340
  * unit viewBox, which is roughly the content width of a 380px phone, so the type
  * inside is real size there and scales up rather than down.
+ *
+ * Three more arrived with the security sections, and those are laid out as HTML
+ * rather than SVG. A flow, a trust stack and a two column comparison are all
+ * sequences of sentences, and a sentence in an SVG does not wrap: it runs off
+ * the side of a phone. Nothing about them is geometric, so nothing is lost.
  */
 
 const WIDTH = 340
@@ -21,6 +26,9 @@ export function Diagram({ spec }: { spec: DiagramSpec }) {
         {spec.kind === 'rows' ? <Rows spec={spec} /> : null}
         {spec.kind === 'buckets' ? <Buckets spec={spec} /> : null}
         {spec.kind === 'link' ? <Link spec={spec} /> : null}
+        {spec.kind === 'flow' ? <Flow spec={spec} /> : null}
+        {spec.kind === 'stack' ? <Stack spec={spec} /> : null}
+        {spec.kind === 'compare' ? <Compare spec={spec} /> : null}
       </div>
       <figcaption className="mt-1.5 text-xs leading-relaxed text-muted">{spec.caption}</figcaption>
     </figure>
@@ -355,5 +363,95 @@ function Link({ spec }: { spec: Extract<DiagramSpec, { kind: 'link' }> }) {
         </g>
       ))}
     </svg>
+  )
+}
+
+// ---------------------------------------------------------------------- flow
+
+/**
+ * A request crossing a system, top to bottom. The dangerous hop is marked once:
+ * signalling stops working the moment two things on one screen are marked.
+ */
+function Flow({ spec }: { spec: Extract<DiagramSpec, { kind: 'flow' }> }) {
+  return (
+    <ol className="space-y-0">
+      {spec.nodes.map((node, index) => (
+        <li key={node.label}>
+          <div
+            className={`border p-2 ${
+              node.danger ? 'border-critical bg-sheet' : 'border-rule bg-raised'
+            }`}
+          >
+            <p className="font-mono text-[11px] font-semibold">{node.label}</p>
+            <p className="mt-1 text-xs leading-relaxed text-muted">{node.note}</p>
+          </div>
+          {index < spec.nodes.length - 1 ? (
+            <div aria-hidden="true" className="flex justify-center py-1 text-xs text-rule-strong">
+              &darr;
+            </div>
+          ) : null}
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+// --------------------------------------------------------------------- stack
+
+const TRUST_LABEL: Record<'trusted' | 'untrusted' | 'mixed', string> = {
+  trusted: 'you wrote this',
+  untrusted: 'someone else wrote this',
+  mixed: 'both, in one string',
+}
+
+/**
+ * Layers of one thing, labelled by how far each is trusted. Built for the
+ * context window: the whole point of that lesson is that the layers look
+ * different on this diagram and identical to the model.
+ */
+function Stack({ spec }: { spec: Extract<DiagramSpec, { kind: 'stack' }> }) {
+  return (
+    <ol className="space-y-1">
+      {spec.layers.map((layer) => (
+        <li
+          key={layer.label}
+          className={`border-l-2 bg-raised p-2 ${
+            layer.trust === 'untrusted'
+              ? 'border-l-critical'
+              : layer.trust === 'mixed'
+                ? 'border-l-high'
+                : 'border-l-accent'
+          }`}
+        >
+          <p className="flex flex-wrap items-baseline justify-between gap-x-2">
+            <span className="font-mono text-[11px] font-semibold">{layer.label}</span>
+            <span className="data">{TRUST_LABEL[layer.trust]}</span>
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-muted">{layer.note}</p>
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+// ------------------------------------------------------------------- compare
+
+/** Two columns, for the pairs that keep being confused with each other. */
+function Compare({ spec }: { spec: Extract<DiagramSpec, { kind: 'compare' }> }) {
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      {[spec.left, spec.right].map((side) => (
+        <div key={side.title} className="border border-rule bg-raised p-2">
+          <p className="font-mono text-[11px] font-semibold">{side.title}</p>
+          <ul className="mt-1.5 space-y-1.5">
+            {side.points.map((point) => (
+              <li key={point} className="text-xs leading-relaxed text-muted">
+                {point}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
   )
 }

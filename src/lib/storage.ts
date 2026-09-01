@@ -34,7 +34,7 @@ import { isValidISODate } from './date.ts'
  * rather than orphaned under a key nothing reads any more.
  */
 export const STORAGE_KEY = 'posture-prep.v1'
-export const SCHEMA_VERSION = 3
+export const SCHEMA_VERSION = 4
 export const DEFAULT_EXAM_DATE = '2026-09-03'
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -43,6 +43,7 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: 'system',
   priorityOnly: false,
   sectionFilter: null,
+  guidedOrder: false,
 }
 
 export function defaultState(): ProgressState {
@@ -111,6 +112,22 @@ const migrations: Record<number, (state: Record<string, unknown>) => Record<stri
     topics: asRecord(state.topics),
     misconceptions: asRecord(state.misconceptions),
   }),
+  // 3 to 4: lessons can be marked as known rather than walked, and the
+  // prerequisite graph became advice rather than a lock. Nothing stored
+  // changes meaning: a lesson finished under the old rules was walked, so it
+  // migrates to skipped false, and guided order defaults off like a new install.
+  3: (state) => {
+    const lessons = asRecord(state.lessons)
+    const migrated: Record<string, unknown> = {}
+    for (const [id, entry] of Object.entries(lessons)) {
+      migrated[id] = { ...asRecord(entry), skipped: false }
+    }
+    return {
+      ...state,
+      lessons: migrated,
+      settings: { ...asRecord(state.settings), guidedOrder: false },
+    }
+  },
 }
 
 function migrate(input: Record<string, unknown>): Record<string, unknown> {
@@ -186,7 +203,14 @@ function coerceSettings(value: unknown): Settings {
     typeof raw.examDate === 'string' && isValidISODate(raw.examDate) ? raw.examDate : DEFAULT_SETTINGS.examDate
   const sectionFilter =
     typeof raw.sectionFilter === 'number' && Number.isFinite(raw.sectionFilter) ? Math.floor(raw.sectionFilter) : null
-  return { level, examDate, theme, priorityOnly: raw.priorityOnly === true, sectionFilter }
+  return {
+    level,
+    examDate,
+    theme,
+    priorityOnly: raw.priorityOnly === true,
+    sectionFilter,
+    guidedOrder: raw.guidedOrder === true,
+  }
 }
 
 const RESULTS: QuestionResult[] = ['correct', 'partial', 'wrong']
@@ -268,6 +292,7 @@ function coerceLesson(value: unknown): LessonProgress {
     produceAttempts: counter(raw.produceAttempts),
     aided: raw.aided === true,
     passedUnaided: raw.passedUnaided === true,
+    skipped: raw.skipped === true,
     completedAt: isoOrNull(raw.completedAt),
   }
 }
